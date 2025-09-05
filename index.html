@@ -463,14 +463,18 @@
 
                 // If within magnetic range (150 pixels), attract towards player
                 if (distance < 150) {
-                    let attractionStrength = Math.max(0.5, 3 - distance / 50); // Stronger when closer
+                    let attractionStrength = Math.max(0.3, 2 - distance / 75); // Weaker attraction, longer range
                     let angle = Math.atan2(dy, dx);
 
-                    // Apply magnetic force
-                    powerUp.vx += Math.cos(angle) * attractionStrength * 0.3;
-                    powerUp.vy += Math.sin(angle) * attractionStrength * 0.3;
+                    // Apply magnetic force more gently
+                    powerUp.vx += Math.cos(angle) * attractionStrength * 0.1;
+                    powerUp.vy += Math.sin(angle) * attractionStrength * 0.1;
 
-                    // Add some damping to prevent wild oscillations
+                    // Stronger damping to prevent overshooting
+                    powerUp.vx *= 0.9;
+                    powerUp.vy *= 0.9;
+                } else {
+                    // Reset velocity when out of range
                     powerUp.vx *= 0.95;
                     powerUp.vy *= 0.95;
                 }
