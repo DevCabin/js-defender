@@ -90,6 +90,29 @@
         <button onclick="resetGame()">PLAY AGAIN</button>
     </div>
 
+    <div id="shopScreen" style="display: none;">
+        <h1>UPGRADE SHOP</h1>
+        <p id="shopCredits">Credits: 0</p>
+        <div id="shopUpgrades">
+            <div class="upgrade" id="plasmaBlaster">
+                <h3>PLASMA BLASTER - 100 Credits</h3>
+                <p>Larger purple projectiles, reduced fire rate, increased damage</p>
+                <button onclick="purchaseUpgrade('plasmaBlaster')">PURCHASE</button>
+            </div>
+            <div class="upgrade" id="missiles">
+                <h3>MISSILES - 100 Credits</h3>
+                <p>White rockets below blaster, slower but high damage</p>
+                <button onclick="purchaseUpgrade('missiles')">PURCHASE</button>
+            </div>
+            <div class="upgrade" id="homingMissiles">
+                <h3>HOMING MISSILES - 200 Credits</h3>
+                <p>Red projectiles that auto-target strongest enemy</p>
+                <button onclick="purchaseUpgrade('homingMissiles')">PURCHASE</button>
+            </div>
+        </div>
+        <button onclick="closeShop()">CONTINUE GAME</button>
+    </div>
+
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
@@ -106,6 +129,15 @@
         let cameraX = 0;
         let highScores = [];
         let gameSpeed = 1.0; // Start at normal speed, can increase
+
+        // Upgrade system
+        let credits = 0;
+        let lastShopTime = 0;
+        let upgrades = {
+            plasmaBlaster: false,
+            missiles: false,
+            homingMissiles: false
+        };
 
         // Audio system
         let audioContext = null;
@@ -224,15 +256,76 @@
         }
         
         function shoot() {
-            bullets.push({
-                x: player.x + player.width,
-                y: player.y + player.height / 2,
-                vx: 8,
-                vy: 0,
-                type: 'laser',
-                width: 12,
-                height: 3
-            });
+            // Primary weapon - Plasma Blaster if owned, otherwise regular laser
+            if (upgrades.plasmaBlaster) {
+                bullets.push({
+                    x: player.x + player.width,
+                    y: player.y + player.height / 2,
+                    vx: 6, // Slower speed
+                    vy: 0,
+                    type: 'plasma',
+                    width: 20, // Larger
+                    height: 6,
+                    damage: 2 // Higher damage
+                });
+            } else {
+                bullets.push({
+                    x: player.x + player.width,
+                    y: player.y + player.height / 2,
+                    vx: 8,
+                    vy: 0,
+                    type: 'laser',
+                    width: 12,
+                    height: 3,
+                    damage: 1
+                });
+            }
+
+            // Secondary weapons
+            if (upgrades.missiles) {
+                bullets.push({
+                    x: player.x + player.width,
+                    y: player.y + player.height / 2 + 8, // Below primary
+                    vx: 4, // Slower
+                    vy: 0,
+                    type: 'missile',
+                    width: 8,
+                    height: 4,
+                    damage: 3 // High damage
+                });
+            }
+
+            if (upgrades.homingMissiles) {
+                // Find strongest enemy for targeting
+                let targetEnemy = null;
+                let maxHealth = 0;
+                enemies.forEach(enemy => {
+                    if (enemy.health > maxHealth) {
+                        maxHealth = enemy.health;
+                        targetEnemy = enemy;
+                    }
+                });
+
+                if (targetEnemy) {
+                    let dx = targetEnemy.x + targetEnemy.width/2 - (player.x + player.width);
+                    let dy = targetEnemy.y + targetEnemy.height/2 - (player.y + player.height/2);
+                    let distance = Math.sqrt(dx * dx + dy * dy);
+                    let speed = 3;
+
+                    bullets.push({
+                        x: player.x + player.width,
+                        y: player.y + player.height / 2 - 8, // Above primary
+                        vx: (dx / distance) * speed,
+                        vy: (dy / distance) * speed,
+                        type: 'homing',
+                        width: 6,
+                        height: 6,
+                        damage: 2,
+                        target: targetEnemy
+                    });
+                }
+            }
+
             playLaserSound();
         }
         
@@ -327,7 +420,9 @@
 
             if (keys[' '] && gameState === 'playing') {
                 shootTimer++;
-                if (shootTimer >= shootDelay) {
+                // Plasma blaster has slower fire rate
+                let currentShootDelay = upgrades.plasmaBlaster ? shootDelay * 1.5 : shootDelay;
+                if (shootTimer >= currentShootDelay) {
                     shoot();
                     shootTimer = 0;
                 }
@@ -416,6 +511,13 @@
                     if (enemy.health <= 0) {
                         createExplosion(enemy.x + enemy.width/2, enemy.y + enemy.height/2, enemy.type === 'boss' ? 80 : 40);
                         playExplosionSound();
+
+                        // Award credits based on enemy type
+                        let enemyCredits = enemy.type === 'boss' ? 50 :
+                                         enemy.type === 'dinosaur' ? 10 :
+                                         enemy.type === 'bomber' ? 5 : 1;
+                        credits += enemyCredits;
+
                         score += enemy.type === 'boss' ? 500 : enemy.type === 'dinosaur' ? 150 : 100;
 
                         if (Math.random() < (enemy.type === 'boss' ? 1 : 0.3)) {
@@ -520,12 +622,12 @@
             for (let i = bullets.length - 1; i >= 0; i--) {
                 let bullet = bullets[i];
                 if (bullet.type === 'enemy') continue;
-                
+
                 for (let j = enemies.length - 1; j >= 0; j--) {
                     let enemy = enemies[j];
                     if (checkCollision(bullet, enemy)) {
-                        enemy.health--;
-                        if (bullet.type === 'laser') {
+                        enemy.health -= bullet.damage || 1; // Use bullet damage or default to 1
+                        if (bullet.type === 'laser' || bullet.type === 'plasma') {
                             bullets.splice(i, 1);
                         }
                         createExplosion(bullet.x, bullet.y, 25);
@@ -751,19 +853,48 @@
                     ctx.moveTo(bullet.x, bullet.y);
                     ctx.lineTo(bullet.x + 12, bullet.y);
                     ctx.stroke();
-                    
+
                     ctx.strokeStyle = '#ffffff';
                     ctx.lineWidth = 1;
                     ctx.beginPath();
                     ctx.moveTo(bullet.x, bullet.y);
                     ctx.lineTo(bullet.x + 12, bullet.y);
                     ctx.stroke();
+                } else if (bullet.type === 'plasma') {
+                    // Larger purple plasma bolt
+                    ctx.fillStyle = '#bd93f9';
+                    ctx.fillRect(bullet.x, bullet.y - 3, bullet.width, bullet.height);
+
+                    ctx.strokeStyle = '#ff79c6';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(bullet.x, bullet.y - 3, bullet.width, bullet.height);
+                } else if (bullet.type === 'missile') {
+                    // White rocket
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(bullet.x, bullet.y - 2, bullet.width, bullet.height);
+
+                    // Rocket trail
+                    ctx.fillStyle = '#ff5555';
+                    ctx.fillRect(bullet.x - 4, bullet.y - 1, 4, 2);
+                } else if (bullet.type === 'homing') {
+                    // Red homing missile
+                    ctx.fillStyle = '#ff5555';
+                    ctx.beginPath();
+                    ctx.arc(bullet.x, bullet.y, 3, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Targeting indicator
+                    ctx.strokeStyle = '#ff5555';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.arc(bullet.x, bullet.y, 6, 0, Math.PI * 2);
+                    ctx.stroke();
                 } else if (bullet.type === 'bomb') {
                     ctx.fillStyle = '#f1c40f';
                     ctx.beginPath();
                     ctx.arc(bullet.x, bullet.y, 4, 0, Math.PI * 2);
                     ctx.fill();
-                    
+
                     ctx.fillStyle = '#ff5555';
                     ctx.beginPath();
                     ctx.arc(bullet.x - 2, bullet.y - 4, 2, 0, Math.PI * 2);
@@ -896,6 +1027,11 @@
             checkCollisions();
             spawnEnemy();
 
+            // Check for shop every 15 seconds
+            if (gameTime - lastShopTime > 15000) {
+                showShop();
+            }
+
             draw();
             updateUI();
 
@@ -983,6 +1119,52 @@
             // Positive ascending tone for power-ups
             playSound(400, 0.1, 'sine', 0.06);
             setTimeout(() => playSound(600, 0.1, 'sine', 0.06), 50);
+        }
+
+        // Shop functions
+        function showShop() {
+            gameState = 'shop';
+            lastShopTime = gameTime;
+            document.getElementById('shopCredits').textContent = `Credits: ${credits}`;
+
+            // Update button states based on affordability and ownership
+            const plasmaBtn = document.querySelector('#plasmaBlaster button');
+            const missilesBtn = document.querySelector('#missiles button');
+            const homingBtn = document.querySelector('#homingMissiles button');
+
+            plasmaBtn.disabled = upgrades.plasmaBlaster || credits < 100;
+            missilesBtn.disabled = upgrades.missiles || credits < 100;
+            homingBtn.disabled = upgrades.homingMissiles || credits < 200;
+
+            plasmaBtn.textContent = upgrades.plasmaBlaster ? 'OWNED' : 'PURCHASE';
+            missilesBtn.textContent = upgrades.missiles ? 'OWNED' : 'PURCHASE';
+            homingBtn.textContent = upgrades.homingMissiles ? 'OWNED' : 'PURCHASE';
+
+            document.getElementById('shopScreen').style.display = 'block';
+        }
+
+        function closeShop() {
+            document.getElementById('shopScreen').style.display = 'none';
+            gameState = 'playing';
+        }
+
+        function purchaseUpgrade(upgradeType) {
+            const costs = {
+                plasmaBlaster: 100,
+                missiles: 100,
+                homingMissiles: 200
+            };
+
+            if (credits >= costs[upgradeType] && !upgrades[upgradeType]) {
+                credits -= costs[upgradeType];
+                upgrades[upgradeType] = true;
+                document.getElementById('shopCredits').textContent = `Credits: ${credits}`;
+
+                // Update button
+                const button = document.querySelector(`#${upgradeType} button`);
+                button.textContent = 'OWNED';
+                button.disabled = true;
+            }
         }
 
         // Initialize
