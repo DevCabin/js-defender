@@ -55,6 +55,23 @@
         button:hover {
             background: #6272a4;
         }
+        #shopScreen {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            z-index: 20;
+            background: rgba(40, 42, 54, 0.95);
+            padding: 20px;
+            border: 2px solid #6272a4;
+            border-radius: 8px;
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out;
+        }
+        #shopScreen.show {
+            opacity: 1;
+        }
     </style>
 </head>
 <body>
@@ -1140,12 +1157,24 @@
             missilesBtn.textContent = upgrades.missiles ? 'OWNED' : 'PURCHASE';
             homingBtn.textContent = upgrades.homingMissiles ? 'OWNED' : 'PURCHASE';
 
-            document.getElementById('shopScreen').style.display = 'block';
+            const shopScreen = document.getElementById('shopScreen');
+            shopScreen.style.display = 'block';
+            // Use setTimeout to ensure display:block is applied before adding the class
+            setTimeout(() => {
+                shopScreen.classList.add('show');
+            }, 10);
         }
 
         function closeShop() {
-            document.getElementById('shopScreen').style.display = 'none';
-            gameState = 'playing';
+            const shopScreen = document.getElementById('shopScreen');
+            shopScreen.classList.remove('show');
+            // Wait for transition to complete before hiding
+            setTimeout(() => {
+                shopScreen.style.display = 'none';
+                gameState = 'playing';
+                // Restart the game loop
+                gameLoop(performance.now());
+            }, 300);
         }
 
         function purchaseUpgrade(upgradeType) {
