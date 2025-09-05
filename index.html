@@ -436,8 +436,9 @@
             powerUps.push({
                 x: x,
                 y: y,
-                type: type,
+                vx: 0, // Initialize horizontal velocity
                 vy: 0, // Start with no vertical velocity (hovering)
+                type: type,
                 timer: 0,
                 hoverTimer: 0,
                 hoverDuration: 480 + Math.random() * 240, // 8-12 seconds at 60fps (480-720 frames) - much longer hover time
