@@ -104,6 +104,8 @@
         let shield = 100;
         let lastBossTime = 0;
         let cameraX = 0;
+        let highScores = [];
+        let gameSpeed = 1.0; // Start at normal speed, can increase
         
         // Input handling
         let keys = {};
@@ -251,10 +253,10 @@
         function spawnEnemy() {
             let enemyTypes = ['fighter', 'bomber', 'dinosaur'];
             // Start with extremely low spawn rate, increase very gradually
-            let baseSpawnChance = Math.min(0.001 + gameTime * 0.00002, 0.04); // Much lower starting rate
+            let baseSpawnChance = Math.min(0.0005 + gameTime * 0.00001, 0.02); // Even lower starting rate
             // Add progressive difficulty: increase spawn rate over time
-            let difficultyMultiplier = 1 + Math.floor(gameTime / 60000) * 0.2; // Slower increase
-            let spawnChance = Math.min(baseSpawnChance * difficultyMultiplier, 0.08); // Lower max rate
+            let difficultyMultiplier = 1 + Math.floor(gameTime / 120000) * 0.15; // Much slower increase
+            let spawnChance = Math.min(baseSpawnChance * difficultyMultiplier, 0.04); // Much lower max rate
 
             // Limit dinosaurs on screen - very restrictive at start
             let currentDinosaurs = enemies.filter(e => e.type === 'dinosaur').length;
@@ -550,7 +552,15 @@
         function gameOver() {
             gameState = 'gameOver';
             let finalScore = score + Math.floor(gameTime / 1000) * 10;
-            document.getElementById('finalScore').textContent = `Final Score: ${finalScore}`;
+
+            // Check if it's a high score
+            if (isHighScore(finalScore)) {
+                addHighScore(playerName, finalScore);
+                document.getElementById('finalScore').textContent = `NEW HIGH SCORE: ${finalScore}`;
+            } else {
+                document.getElementById('finalScore').textContent = `Final Score: ${finalScore}`;
+            }
+
             document.getElementById('playerNameDisplay').textContent = `Player: ${playerName}`;
             document.getElementById('gameOverScreen').style.display = 'block';
         }
@@ -897,6 +907,15 @@
             lastTime = currentTime;
             gameTime += deltaTime;
 
+            // Gradually increase game speed over time and with powerups
+            let baseSpeed = 1.0;
+            let timeBonus = Math.min(gameTime / 300000, 0.5); // Max 50% speed increase over 5 minutes
+            let powerupBonus = Math.min((bombs - 3) * 0.1, 0.3); // Speed up with extra bombs (max 30%)
+            gameSpeed = baseSpeed + timeBonus + powerupBonus;
+
+            // Apply speed multiplier to deltaTime
+            let adjustedDeltaTime = deltaTime * gameSpeed;
+
             updatePlayer();
             updateBullets();
             updateEnemies();
@@ -911,7 +930,36 @@
             requestAnimationFrame(gameLoop);
         }
         
+        // Load high scores from localStorage
+        function loadHighScores() {
+            const saved = localStorage.getItem('defenderHighScores');
+            if (saved) {
+                highScores = JSON.parse(saved);
+            } else {
+                highScores = [];
+            }
+        }
+
+        // Save high scores to localStorage
+        function saveHighScores() {
+            localStorage.setItem('defenderHighScores', JSON.stringify(highScores));
+        }
+
+        // Add score to high scores list
+        function addHighScore(name, score) {
+            highScores.push({ name: name, score: score });
+            highScores.sort((a, b) => b.score - a.score);
+            highScores = highScores.slice(0, 10); // Keep only top 10
+            saveHighScores();
+        }
+
+        // Check if score is a high score
+        function isHighScore(score) {
+            return highScores.length < 10 || score > highScores[highScores.length - 1].score;
+        }
+
         // Initialize
+        loadHighScores();
         initTerrain();
         initStars();
     </script>
