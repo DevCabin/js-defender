@@ -55,6 +55,13 @@
         button:hover {
             background: #6272a4;
         }
+        button.affordable {
+            background: #50fa7b;
+            color: #282a36;
+        }
+        button.affordable:hover {
+            background: #7bfaad;
+        }
         #shopScreen {
             position: absolute;
             top: 50%;
@@ -152,8 +159,9 @@
         let lastShopTime = 0;
         let upgrades = {
             plasmaBlaster: false,
-            missiles: false,
-            homingMissiles: false
+            missiles: 0, // 0 = none, 1 = tier 1, 2 = tier 2
+            homingMissiles: 0, // 0 = none, 1 = tier 1, 2 = tier 2
+            bombCapacity: false // false = 9 max, true = 50 max
         };
 
         // Audio system
@@ -163,7 +171,9 @@
         // Input handling
         let keys = {};
         let shootTimer = 0;
+        let homingMissileTimer = 0;
         const shootDelay = 8;
+        const homingMissileDelay = 24; // Slower firing rate for homing missiles (3x slower)
         
         // Game objects
         let player = {
@@ -189,6 +199,13 @@
             if (e.key === ' ') e.preventDefault();
             if (e.key && e.key.toLowerCase() === 'b' && gameState === 'playing') {
                 dropBomb();
+            }
+            if (e.key === 'Enter') {
+                if (gameState === 'start') {
+                    startGame();
+                } else if (gameState === 'shop') {
+                    closeShop();
+                }
             }
         });
         
@@ -298,28 +315,90 @@
                 });
             }
 
-            // Secondary weapons
-            if (upgrades.missiles) {
+            // Secondary weapons - Missiles
+            if (upgrades.missiles >= 1) {
+                // Tier 1 missile (below)
                 bullets.push({
                     x: player.x + player.width,
-                    y: player.y + player.height / 2 + 8, // Below primary
-                    vx: 4, // Slower
+                    y: player.y + player.height / 2 + 8,
+                    vx: 4,
                     vy: 0,
                     type: 'missile',
                     width: 8,
                     height: 4,
-                    damage: 3 // High damage
+                    damage: 3,
+                    tier: 1
                 });
             }
 
-            if (upgrades.homingMissiles) {
-                // Find strongest enemy for targeting
+            if (upgrades.missiles >= 2) {
+                // Tier 2 missile (above)
+                bullets.push({
+                    x: player.x + player.width,
+                    y: player.y + player.height / 2 - 8,
+                    vx: 4,
+                    vy: 0,
+                    type: 'missile',
+                    width: 8,
+                    height: 4,
+                    damage: 3,
+                    tier: 2
+                });
+            }
+
+            playLaserSound();
+        }
+
+        function shootHomingMissiles() {
+            // Homing Missiles - fired at slower rate
+            if (upgrades.homingMissiles >= 1) {
+                // Tier 1: Target strongest enemy
                 let targetEnemy = null;
                 let maxHealth = 0;
                 enemies.forEach(enemy => {
                     if (enemy.health > maxHealth) {
                         maxHealth = enemy.health;
                         targetEnemy = enemy;
+                    }
+                });
+
+                if (targetEnemy) {
+                    console.log('Firing homing missile at enemy with health:', maxHealth);
+                    let dx = targetEnemy.x + targetEnemy.width/2 - (player.x + player.width);
+                    let dy = targetEnemy.y + targetEnemy.height/2 - (player.y + player.height/2);
+                    let distance = Math.sqrt(dx * dx + dy * dy);
+                    let speed = 3;
+
+                    bullets.push({
+                        x: player.x + player.width,
+                        y: player.y + player.height / 2 - 8,
+                        vx: (dx / distance) * speed,
+                        vy: (dy / distance) * speed,
+                        type: 'homing',
+                        width: 6,
+                        height: 6,
+                        damage: 2,
+                        target: targetEnemy,
+                        tier: 1
+                    });
+                }
+            }
+
+            if (upgrades.homingMissiles >= 2) {
+                // Tier 2: Target nearest enemy with full health (not yet fired upon)
+                let targetEnemy = null;
+                let minDistance = Infinity;
+
+                enemies.forEach(enemy => {
+                    if (enemy.health === enemy.maxHealth || enemy.health > 5) { // Target healthy enemies
+                        let dx = enemy.x + enemy.width/2 - (player.x + player.width);
+                        let dy = enemy.y + enemy.height/2 - (player.y + player.height/2);
+                        let distance = Math.sqrt(dx * dx + dy * dy);
+
+                        if (distance < minDistance) {
+                            minDistance = distance;
+                            targetEnemy = enemy;
+                        }
                     }
                 });
 
@@ -331,19 +410,18 @@
 
                     bullets.push({
                         x: player.x + player.width,
-                        y: player.y + player.height / 2 - 8, // Above primary
+                        y: player.y + player.height / 2 + 8, // Below tier 1
                         vx: (dx / distance) * speed,
                         vy: (dy / distance) * speed,
                         type: 'homing',
                         width: 6,
                         height: 6,
                         damage: 2,
-                        target: targetEnemy
+                        target: targetEnemy,
+                        tier: 2
                     });
                 }
             }
-
-            playLaserSound();
         }
         
         function dropBomb() {
@@ -394,6 +472,7 @@
                 }
 
                 let spawnX = cameraX + canvas.width + 50;
+                let enemyHealth = type === 'dinosaur' ? 3 + Math.floor(gameTime / 45000) : 1 + Math.floor(gameTime / 60000);
                 let enemy = {
                     type: type,
                     x: spawnX,
@@ -402,7 +481,8 @@
                     height: type === 'dinosaur' ? 35 : type === 'boss' ? 60 : 20,
                     vx: -1.5 - Math.random() * 1 - Math.floor(gameTime / 60000) * 0.15, // Much slower speed increase over time
                     vy: 0,
-                    health: type === 'dinosaur' ? 3 + Math.floor(gameTime / 45000) : 1 + Math.floor(gameTime / 60000), // More health over time
+                    health: enemyHealth,
+                    maxHealth: enemyHealth, // Store initial health for tier 2 homing missiles
                     shootTimer: 0,
                     walkTimer: type === 'dinosaur' ? Math.random() * 100 : 0 // For walking animation
                 };
@@ -413,6 +493,7 @@
             let bossInterval = Math.max(20000 - Math.floor(gameTime / 60000) * 3000, 10000);
             if (gameTime - lastBossTime > bossInterval) {
                 let spawnX = cameraX + canvas.width + 100;
+                let bossHealth = 10 + Math.floor(gameTime / 45000) * 5;
                 enemies.push({
                     type: 'boss',
                     x: spawnX,
@@ -421,7 +502,8 @@
                     height: 60,
                     vx: -1 - Math.floor(gameTime / 120000) * 0.15, // Much slower boss speed increase
                     vy: 0,
-                    health: 10 + Math.floor(gameTime / 45000) * 5, // More health for bosses
+                    health: bossHealth,
+                    maxHealth: bossHealth, // Store initial health for tier 2 homing missiles
                     shootTimer: 0,
                     moveTimer: 0
                 });
@@ -437,14 +519,23 @@
 
             if (keys[' '] && gameState === 'playing') {
                 shootTimer++;
-                // Plasma blaster has slower fire rate
+                homingMissileTimer++;
+
+                // Regular weapons (laser/plasma/missiles) - normal fire rate
                 let currentShootDelay = upgrades.plasmaBlaster ? shootDelay * 1.5 : shootDelay;
                 if (shootTimer >= currentShootDelay) {
                     shoot();
                     shootTimer = 0;
                 }
+
+                // Homing missiles - slower fire rate
+                if (homingMissileTimer >= homingMissileDelay) {
+                    shootHomingMissiles();
+                    homingMissileTimer = 0;
+                }
             } else {
                 shootTimer = 0;
+                homingMissileTimer = 0;
             }
 
             player.vx *= 0.92;
@@ -468,6 +559,34 @@
         function updateBullets() {
             for (let i = bullets.length - 1; i >= 0; i--) {
                 let bullet = bullets[i];
+
+                // Homing missile targeting logic
+                if (bullet.type === 'homing' && bullet.target && enemies.includes(bullet.target)) {
+                    let target = bullet.target;
+                    let dx = target.x + target.width/2 - bullet.x;
+                    let dy = target.y + target.height/2 - bullet.y;
+                    let distance = Math.sqrt(dx * dx + dy * dy);
+
+                    if (distance > 0) {
+                        // Adjust velocity towards target (smooth homing)
+                        let homingSpeed = 3;
+                        let homingStrength = 0.1; // How aggressively it turns
+
+                        let targetVx = (dx / distance) * homingSpeed;
+                        let targetVy = (dy / distance) * homingSpeed;
+
+                        bullet.vx += (targetVx - bullet.vx) * homingStrength;
+                        bullet.vy += (targetVy - bullet.vy) * homingStrength;
+
+                        // Normalize speed to maintain consistent velocity
+                        let currentSpeed = Math.sqrt(bullet.vx * bullet.vx + bullet.vy * bullet.vy);
+                        if (currentSpeed > 0) {
+                            bullet.vx = (bullet.vx / currentSpeed) * homingSpeed;
+                            bullet.vy = (bullet.vy / currentSpeed) * homingSpeed;
+                        }
+                    }
+                }
+
                 bullet.x += bullet.vx;
                 bullet.y += bullet.vy;
 
@@ -496,19 +615,42 @@
                 let enemy = enemies[i];
                 enemy.x += enemy.vx;
                 enemy.y += enemy.vy;
-                
+
                 if (enemy.type === 'boss') {
                     enemy.moveTimer++;
                     enemy.vy = Math.sin(enemy.moveTimer * 0.05) * 2;
                 }
-                
+
+                if (enemy.type === 'dinosaur') {
+                    // Ground enemy behavior - follow terrain
+                    enemy.walkTimer++;
+                    let terrainHeight = getTerrainHeight(enemy.x + enemy.width/2);
+                    let targetY = terrainHeight - enemy.height;
+
+                    // Smoothly move towards terrain height
+                    let dy = targetY - enemy.y;
+                    enemy.vy = dy * 0.1; // Smooth terrain following
+
+                    // Add slight bobbing for walking animation
+                    enemy.y += Math.sin(enemy.walkTimer * 0.3) * 0.5;
+
+                    // Randomly change direction occasionally
+                    if (Math.random() < 0.005) {
+                        enemy.vx = -enemy.vx;
+                    }
+
+                    // Don't let dinosaurs go too high or too low
+                    if (enemy.y < targetY - 10) enemy.y = targetY - 10;
+                    if (enemy.y > targetY + 10) enemy.y = targetY + 10;
+                }
+
                 enemy.shootTimer++;
                 // Enemies shoot dramatically less frequently for beginner-friendly experience
                 let shootDelay = gameTime < 30000 ? 300 + Math.random() * 200 : // First 30 seconds: very slow shooting (5-8.3 seconds)
                                 gameTime < 60000 ? 240 + Math.random() * 120 :   // Next 30 seconds: slow shooting (4-6 seconds)
                                 gameTime < 120000 ? 180 + Math.random() * 90 :   // Next 60 seconds: moderate shooting (3-4.5 seconds)
                                 120 + Math.random() * 60;                        // After that: normal shooting (2-3 seconds)
-                
+
                 if (enemy.shootTimer > shootDelay) {
                     if (enemy.type !== 'dinosaur' || enemy.y > canvas.height - 100) {
                         bullets.push({
@@ -523,7 +665,7 @@
                     }
                     enemy.shootTimer = 0;
                 }
-                
+
                 if (enemy.x < -100 || enemy.health <= 0) {
                     if (enemy.health <= 0) {
                         createExplosion(enemy.x + enemy.width/2, enemy.y + enemy.height/2, enemy.type === 'boss' ? 80 : 40);
@@ -611,7 +753,8 @@
                 if (checkCollision(player, powerUp)) {
                     switch (powerUp.type) {
                         case 'bombs':
-                            bombs = Math.min(bombs + 3, 9);
+                            const maxBombs = upgrades.bombCapacity ? 50 : 9;
+                            bombs = Math.min(bombs + 3, maxBombs);
                             break;
                         case 'shield':
                             shield = Math.min(shield + 25, 100);
@@ -894,18 +1037,22 @@
                     ctx.fillStyle = '#ff5555';
                     ctx.fillRect(bullet.x - 4, bullet.y - 1, 4, 2);
                 } else if (bullet.type === 'homing') {
-                    // Red homing missile
+                    // Red homing missile with white tail
                     ctx.fillStyle = '#ff5555';
-                    ctx.beginPath();
-                    ctx.arc(bullet.x, bullet.y, 3, 0, Math.PI * 2);
-                    ctx.fill();
+                    ctx.fillRect(bullet.x, bullet.y - bullet.height/2, bullet.width, bullet.height);
 
-                    // Targeting indicator
+                    // White missile tail
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(bullet.x - bullet.width/2, bullet.y - bullet.height/4, bullet.width/2, bullet.height/2);
+
+                    // Targeting indicator (subtle)
                     ctx.strokeStyle = '#ff5555';
                     ctx.lineWidth = 1;
+                    ctx.globalAlpha = 0.5;
                     ctx.beginPath();
-                    ctx.arc(bullet.x, bullet.y, 6, 0, Math.PI * 2);
+                    ctx.arc(bullet.x + bullet.width/2, bullet.y, bullet.width * 1.5, 0, Math.PI * 2);
                     ctx.stroke();
+                    ctx.globalAlpha = 1;
                 } else if (bullet.type === 'bomb') {
                     ctx.fillStyle = '#f1c40f';
                     ctx.beginPath();
@@ -1044,8 +1191,8 @@
             checkCollisions();
             spawnEnemy();
 
-            // Check for shop every 15 seconds
-            if (gameTime - lastShopTime > 15000) {
+                    // Check for shop every 30 seconds
+            if (gameTime - lastShopTime > 30000) {
                 showShop();
             }
 
@@ -1140,22 +1287,12 @@
 
         // Shop functions
         function showShop() {
+            console.log('Shop triggered! Credits:', credits, 'Upgrades:', upgrades);
             gameState = 'shop';
             lastShopTime = gameTime;
             document.getElementById('shopCredits').textContent = `Credits: ${credits}`;
 
-            // Update button states based on affordability and ownership
-            const plasmaBtn = document.querySelector('#plasmaBlaster button');
-            const missilesBtn = document.querySelector('#missiles button');
-            const homingBtn = document.querySelector('#homingMissiles button');
-
-            plasmaBtn.disabled = upgrades.plasmaBlaster || credits < 100;
-            missilesBtn.disabled = upgrades.missiles || credits < 100;
-            homingBtn.disabled = upgrades.homingMissiles || credits < 200;
-
-            plasmaBtn.textContent = upgrades.plasmaBlaster ? 'OWNED' : 'PURCHASE';
-            missilesBtn.textContent = upgrades.missiles ? 'OWNED' : 'PURCHASE';
-            homingBtn.textContent = upgrades.homingMissiles ? 'OWNED' : 'PURCHASE';
+            updateShopButtons();
 
             const shopScreen = document.getElementById('shopScreen');
             shopScreen.style.display = 'block';
@@ -1163,6 +1300,81 @@
             setTimeout(() => {
                 shopScreen.classList.add('show');
             }, 10);
+        }
+
+        function updateShopButtons() {
+            const shopUpgrades = document.getElementById('shopUpgrades');
+            shopUpgrades.innerHTML = ''; // Clear all existing items
+
+            // Plasma Blaster - only show if not purchased
+            if (!upgrades.plasmaBlaster) {
+                const plasmaDiv = document.createElement('div');
+                plasmaDiv.className = 'upgrade';
+                plasmaDiv.id = 'plasmaBlaster';
+                plasmaDiv.innerHTML = `
+                    <h3>PLASMA BLASTER - 100 Credits</h3>
+                    <p>Larger purple projectiles, reduced fire rate, increased damage</p>
+                    <button onclick="purchaseUpgrade('plasmaBlaster')" ${credits >= 100 ? 'class="affordable"' : ''}>PURCHASE</button>
+                `;
+                shopUpgrades.appendChild(plasmaDiv);
+            }
+
+            // Missiles - show appropriate tier
+            if (upgrades.missiles < 2) {
+                const missilesDiv = document.createElement('div');
+                missilesDiv.className = 'upgrade';
+                missilesDiv.id = 'missiles';
+
+                if (upgrades.missiles === 0) {
+                    missilesDiv.innerHTML = `
+                        <h3>MISSILES TIER 1 - 100 Credits</h3>
+                        <p>White rockets below blaster, slower but high damage</p>
+                        <button onclick="purchaseUpgrade('missiles')" ${credits >= 100 ? 'class="affordable"' : ''}>PURCHASE</button>
+                    `;
+                } else if (upgrades.missiles === 1) {
+                    missilesDiv.innerHTML = `
+                        <h3>MISSILES TIER 2 - 200 Credits</h3>
+                        <p>Second missile above blaster, same high damage</p>
+                        <button onclick="purchaseUpgrade('missiles')" ${credits >= 200 ? 'class="affordable"' : ''}>UPGRADE</button>
+                    `;
+                }
+                shopUpgrades.appendChild(missilesDiv);
+            }
+
+            // Homing Missiles - show appropriate tier
+            if (upgrades.homingMissiles < 2) {
+                const homingDiv = document.createElement('div');
+                homingDiv.className = 'upgrade';
+                homingDiv.id = 'homingMissiles';
+
+                if (upgrades.homingMissiles === 0) {
+                    homingDiv.innerHTML = `
+                        <h3>HOMING MISSILES TIER 1 - 200 Credits</h3>
+                        <p>Red projectiles that auto-target strongest enemy</p>
+                        <button onclick="purchaseUpgrade('homingMissiles')" ${credits >= 200 ? 'class="affordable"' : ''}>PURCHASE</button>
+                    `;
+                } else if (upgrades.homingMissiles === 1) {
+                    homingDiv.innerHTML = `
+                        <h3>HOMING MISSILES TIER 2 - 400 Credits</h3>
+                        <p>Second missile targets nearest healthy enemy</p>
+                        <button onclick="purchaseUpgrade('homingMissiles')" ${credits >= 400 ? 'class="affordable"' : ''}>UPGRADE</button>
+                    `;
+                }
+                shopUpgrades.appendChild(homingDiv);
+            }
+
+            // Bomb Capacity - only show if not purchased
+            if (!upgrades.bombCapacity) {
+                const bombDiv = document.createElement('div');
+                bombDiv.className = 'upgrade';
+                bombDiv.id = 'bombCapacity';
+                bombDiv.innerHTML = `
+                    <h3>BOMB CAPACITY UPGRADE - 350 Credits</h3>
+                    <p>Increase maximum bomb capacity from 9 to 50 bombs</p>
+                    <button onclick="purchaseUpgrade('bombCapacity')" ${credits >= 350 ? 'class="affordable"' : ''}>PURCHASE</button>
+                `;
+                shopUpgrades.appendChild(bombDiv);
+            }
         }
 
         function closeShop() {
@@ -1178,21 +1390,37 @@
         }
 
         function purchaseUpgrade(upgradeType) {
-            const costs = {
-                plasmaBlaster: 100,
-                missiles: 100,
-                homingMissiles: 200
-            };
+            let cost = 0;
+            let canPurchase = false;
 
-            if (credits >= costs[upgradeType] && !upgrades[upgradeType]) {
-                credits -= costs[upgradeType];
-                upgrades[upgradeType] = true;
+            if (upgradeType === 'plasmaBlaster') {
+                cost = 100;
+                canPurchase = !upgrades.plasmaBlaster && credits >= cost;
+            } else if (upgradeType === 'missiles') {
+                cost = upgrades.missiles === 0 ? 100 : 200; // Tier 1: 100, Tier 2: 200
+                canPurchase = upgrades.missiles < 2 && credits >= cost;
+            } else if (upgradeType === 'homingMissiles') {
+                cost = upgrades.homingMissiles === 0 ? 200 : 400; // Tier 1: 200, Tier 2: 400
+                canPurchase = upgrades.homingMissiles < 2 && credits >= cost;
+            } else if (upgradeType === 'bombCapacity') {
+                cost = 350;
+                canPurchase = !upgrades.bombCapacity && credits >= cost;
+            }
+
+            if (canPurchase) {
+                credits -= cost;
+                if (upgradeType === 'plasmaBlaster') {
+                    upgrades.plasmaBlaster = true;
+                } else if (upgradeType === 'missiles') {
+                    upgrades.missiles++;
+                } else if (upgradeType === 'homingMissiles') {
+                    upgrades.homingMissiles++;
+                } else if (upgradeType === 'bombCapacity') {
+                    upgrades.bombCapacity = true;
+                }
+
                 document.getElementById('shopCredits').textContent = `Credits: ${credits}`;
-
-                // Update button
-                const button = document.querySelector(`#${upgradeType} button`);
-                button.textContent = 'OWNED';
-                button.disabled = true;
+                updateShopButtons();
             }
         }
 
