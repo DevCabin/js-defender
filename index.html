@@ -106,6 +106,10 @@
         let cameraX = 0;
         let highScores = [];
         let gameSpeed = 1.0; // Start at normal speed, can increase
+
+        // Audio system
+        let audioContext = null;
+        let lastLaserTime = 0;
         
         // Input handling
         let keys = {};
@@ -229,6 +233,7 @@
                 width: 12,
                 height: 3
             });
+            playLaserSound();
         }
         
         function dropBomb() {
@@ -362,6 +367,7 @@
 
                 if (bullet.type === 'bomb' && bullet.y > getTerrainHeight(bullet.x) - 10) {
                     createExplosion(bullet.x, bullet.y, 60);
+                    playBombExplosionSound();
                     enemies.forEach(enemy => {
                         let dist = Math.sqrt((enemy.x + enemy.width/2 - bullet.x) ** 2 + (enemy.y + enemy.height/2 - bullet.y) ** 2);
                         if (dist < 80) {
@@ -409,8 +415,9 @@
                 if (enemy.x < -100 || enemy.health <= 0) {
                     if (enemy.health <= 0) {
                         createExplosion(enemy.x + enemy.width/2, enemy.y + enemy.height/2, enemy.type === 'boss' ? 80 : 40);
+                        playExplosionSound();
                         score += enemy.type === 'boss' ? 500 : enemy.type === 'dinosaur' ? 150 : 100;
-                        
+
                         if (Math.random() < (enemy.type === 'boss' ? 1 : 0.3)) {
                             spawnPowerUp(enemy.x, enemy.y, enemy.type === 'boss');
                         }
@@ -470,6 +477,7 @@
                             break;
                     }
                     score += 50;
+                    playPowerUpSound();
                     powerUps.splice(i, 1);
                 }
             }
@@ -897,10 +905,66 @@
             return highScores.length < 10 || score > highScores[highScores.length - 1].score;
         }
 
+        // Audio functions
+        function initAudio() {
+            try {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            } catch (e) {
+                console.log('Web Audio API not supported');
+            }
+        }
+
+        function playSound(frequency, duration, type = 'square', volume = 0.1) {
+            if (!audioContext) return;
+
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+
+            oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
+            oscillator.type = type;
+
+            gainNode.gain.setValueAtTime(volume, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
+
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + duration);
+        }
+
+        function playLaserSound() {
+            // Very quiet laser sound - only play if enough time has passed
+            const now = Date.now();
+            if (now - lastLaserTime > 50) { // Limit to prevent spam
+                playSound(800, 0.05, 'square', 0.02);
+                lastLaserTime = now;
+            }
+        }
+
+        function playExplosionSound() {
+            // Enemy explosion - descending tone
+            playSound(300, 0.2, 'sawtooth', 0.08);
+            setTimeout(() => playSound(150, 0.1, 'sawtooth', 0.06), 50);
+        }
+
+        function playBombExplosionSound() {
+            // Bomb explosion - low frequency rumble
+            playSound(100, 0.3, 'sawtooth', 0.1);
+            setTimeout(() => playSound(80, 0.2, 'sawtooth', 0.08), 100);
+        }
+
+        function playPowerUpSound() {
+            // Positive ascending tone for power-ups
+            playSound(400, 0.1, 'sine', 0.06);
+            setTimeout(() => playSound(600, 0.1, 'sine', 0.06), 50);
+        }
+
         // Initialize
         loadHighScores();
         initTerrain();
         initStars();
+        initAudio();
     </script>
 </body>
 </html>
