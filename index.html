@@ -90,6 +90,7 @@
         <div>Bombs: <span id="bombs">3</span></div>
         <div>Shield: <span id="shield">100</span>%</div>
         <div>Time: <span id="time">0</span>s</div>
+        <div>Parsecs: <span id="distance">0</span></div>
         <div style="margin-top: 10px;">
             <div style="color: #50fa7b; font-size: 12px;">POWER</div>
             <canvas id="powerMeter" width="100" height="20" style="border: 1px solid #6272a4; background: #282a36;"></canvas>
@@ -151,6 +152,7 @@
         let shield = 100;
         let lastBossTime = 0;
         let cameraX = 0;
+        let distanceTraveled = 0; // Track distance in pixels
         let highScores = [];
         let gameSpeed = 1.0; // Start at normal speed, can increase
 
@@ -472,7 +474,7 @@
                 }
 
                 let spawnX = cameraX + canvas.width + 50;
-                let enemyHealth = type === 'dinosaur' ? 3 + Math.floor(gameTime / 45000) : 1 + Math.floor(gameTime / 60000);
+                let enemyHealth = type === 'dinosaur' ? 8 + Math.floor(gameTime / 45000) : 1 + Math.floor(gameTime / 60000);
                 let enemy = {
                     type: type,
                     x: spawnX,
@@ -540,6 +542,12 @@
 
             player.vx *= 0.92;
             player.vy *= 0.92;
+
+            // Track distance traveled (only horizontal movement counts)
+            if (player.vx > 0) {
+                distanceTraveled += player.vx;
+            }
+
             player.x += player.vx;
             player.y += player.vy;
 
@@ -571,6 +579,33 @@
                         // Adjust velocity towards target (smooth homing)
                         let homingSpeed = 3;
                         let homingStrength = 0.1; // How aggressively it turns
+
+                        let targetVx = (dx / distance) * homingSpeed;
+                        let targetVy = (dy / distance) * homingSpeed;
+
+                        bullet.vx += (targetVx - bullet.vx) * homingStrength;
+                        bullet.vy += (targetVy - bullet.vy) * homingStrength;
+
+                        // Normalize speed to maintain consistent velocity
+                        let currentSpeed = Math.sqrt(bullet.vx * bullet.vx + bullet.vy * bullet.vy);
+                        if (currentSpeed > 0) {
+                            bullet.vx = (bullet.vx / currentSpeed) * homingSpeed;
+                            bullet.vy = (bullet.vy / currentSpeed) * homingSpeed;
+                        }
+                    }
+                }
+
+                // Enemy homing missile targeting logic
+                if (bullet.type === 'enemyHoming' && bullet.target) {
+                    let target = bullet.target;
+                    let dx = target.x + target.width/2 - bullet.x;
+                    let dy = target.y + target.height/2 - bullet.y;
+                    let distance = Math.sqrt(dx * dx + dy * dy);
+
+                    if (distance > 0) {
+                        // Adjust velocity towards target (smooth homing)
+                        let homingSpeed = 2.5;
+                        let homingStrength = 0.08; // Slightly less aggressive than player missiles
 
                         let targetVx = (dx / distance) * homingSpeed;
                         let targetVy = (dy / distance) * homingSpeed;
@@ -652,7 +687,25 @@
                                 120 + Math.random() * 60;                        // After that: normal shooting (2-3 seconds)
 
                 if (enemy.shootTimer > shootDelay) {
-                    if (enemy.type !== 'dinosaur' || enemy.y > canvas.height - 100) {
+                    if (enemy.type === 'dinosaur') {
+                        // Dinosaurs shoot heat-seeking missiles
+                        let dx = player.x + player.width/2 - enemy.x;
+                        let dy = player.y + player.height/2 - enemy.y;
+                        let distance = Math.sqrt(dx * dx + dy * dy);
+                        if (distance > 0) {
+                            let speed = 2.5;
+                            bullets.push({
+                                x: enemy.x,
+                                y: enemy.y + enemy.height / 2,
+                                vx: (dx / distance) * speed,
+                                vy: (dy / distance) * speed,
+                                type: 'enemyHoming',
+                                width: 5,
+                                height: 5,
+                                target: player
+                            });
+                        }
+                    } else {
                         bullets.push({
                             x: enemy.x,
                             y: enemy.y + enemy.height / 2,
@@ -847,7 +900,8 @@
         
         function gameOver() {
             gameState = 'gameOver';
-            let finalScore = score + Math.floor(gameTime / 1000) * 10;
+            let parsecs = Math.floor(distanceTraveled / 100);
+            let finalScore = score + Math.floor(gameTime / 1000) * 10 + parsecs * 5; // Distance bonus: 5 points per parsec
 
             // Check if it's a high score
             if (isHighScore(finalScore)) {
@@ -857,7 +911,7 @@
                 document.getElementById('finalScore').textContent = `Final Score: ${finalScore}`;
             }
 
-            document.getElementById('playerNameDisplay').textContent = `Player: ${playerName}`;
+            document.getElementById('playerNameDisplay').textContent = `Player: ${playerName} - ${parsecs} Parsecs Traveled`;
             document.getElementById('gameOverScreen').style.display = 'block';
         }
         
@@ -1063,6 +1117,17 @@
                     ctx.beginPath();
                     ctx.arc(bullet.x - 2, bullet.y - 4, 2, 0, Math.PI * 2);
                     ctx.fill();
+                } else if (bullet.type === 'enemyHoming') {
+                    // Enemy heat-seeking missile - orange with darker trail
+                    ctx.fillStyle = '#ff8c00';
+                    ctx.beginPath();
+                    ctx.arc(bullet.x, bullet.y, 3, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.fillStyle = '#cc5500';
+                    ctx.beginPath();
+                    ctx.arc(bullet.x - 2, bullet.y - 2, 1.5, 0, Math.PI * 2);
+                    ctx.fill();
                 } else {
                     ctx.fillStyle = '#ff5555';
                     ctx.beginPath();
@@ -1137,6 +1202,7 @@
             document.getElementById('bombs').textContent = bombs;
             document.getElementById('shield').textContent = Math.max(0, shield);
             document.getElementById('time').textContent = Math.floor(gameTime / 1000);
+            document.getElementById('distance').textContent = Math.floor(distanceTraveled / 100); // Convert pixels to parsecs
 
             // Draw power meter
             const powerMeterCanvas = document.getElementById('powerMeter');
