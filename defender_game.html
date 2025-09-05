@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Defender - Space Shooter</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #282a36;
+            color: #f8f8f2;
+            font-family: 'Courier New', monospace;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        #gameCanvas {
+            border: 2px solid #44475a;
+            background: linear-gradient(to bottom, #282a36 0%, #21222c 50%, #191a21 100%);
+        }
+        #ui {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 10;
+        }
+        #startScreen, #gameOverScreen {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            z-index: 20;
+            background: rgba(40, 42, 54, 0.9);
+            padding: 20px;
+            border: 2px solid #6272a4;
+            border-radius: 8px;
+        }
+        input {
+            background: #44475a;
+            border: 1px solid #6272a4;
+            color: #f8f8f2;
+            padding: 5px;
+            margin: 10px;
+        }
+        button {
+            background: #44475a;
+            border: 1px solid #6272a4;
+            color: #f8f8f2;
+            padding: 10px 20px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #6272a4;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    
+    <div id="ui">
+        <div>Score: <span id="score">0</span></div>
+        <div>Lives: <span id="lives">3</span></div>
+        <div>Bombs: <span id="bombs">3</span></div>
+        <div>Shield: <span id="shield">100</span>%</div>
+        <div>Time: <span id="time">0</span>s</div>
+        <div style="margin-top: 10px;">
+            <div style="color: #50fa7b; font-size: 12px;">POWER</div>
+            <canvas id="powerMeter" width="100" height="20" style="border: 1px solid #6272a4; background: #282a36;"></canvas>
+        </div>
+    </div>
+
+    <div id="startScreen">
+        <h1>DEFENDER</h1>
+        <p>Protect the planet from alien invaders!</p>
+        <input type="text" id="playerName" placeholder="Enter your name" maxlength="20">
+        <br>
+        <button onclick="startGame()">START GAME</button>
+        <br><br>
+        <p>Controls:</p>
+        <p>Arrow Keys: Move | Spacebar: Laser | B: Bomb</p>
+    </div>
+
+    <div id="gameOverScreen" style="display: none;">
+        <h1>GAME OVER</h1>
+        <p id="finalScore"></p>
+        <p id="playerNameDisplay"></p>
+        <button onclick="resetGame()">PLAY AGAIN</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        let gameState = 'start';
+        let playerName = '';
+        let gameTime = 0;
+        let lastTime = 0;
+        let score = 0;
+        let lives = 3;
+        let bombs = 3;
+        let shield = 100;
+        let lastBossTime = 0;
+        let cameraX = 0;
+        
+        // Input handling
+        let keys = {};
+        let shootTimer = 0;
+        const shootDelay = 8;
+        
+        // Game objects
+        let player = {
+            x: 100,
+            y: 300,
+            width: 20,
+            height: 16,
+            vx: 0,
+            vy: 0,
+            maxSpeed: 5
+        };
+        
+        let bullets = [];
+        let enemies = [];
+        let explosions = [];
+        let powerUps = [];
+        let stars = [];
+        let terrain = [];
+        
+        // Event listeners
+        document.addEventListener('keydown', (e) => {
+            keys[e.key] = true;
+            if (e.key === ' ') e.preventDefault();
+            if (e.key && e.key.toLowerCase() === 'b' && gameState === 'playing') {
+                dropBomb();
+            }
+        });
+        
+        document.addEventListener('keyup', (e) => {
+            keys[e.key] = false;
+        });
+        
+        // World width is 3 screen widths, then loops back
+        const WORLD_WIDTH = canvas.width * 3;
+
+        function initTerrain() {
+            terrain = [];
+            // Generate terrain for the fixed world width
+            for (let x = 0; x < WORLD_WIDTH; x += 10) {
+                let height = 450 + Math.sin(x * 0.02) * 20 + Math.sin(x * 0.005) * 40;
+                if (Math.random() < 0.1) {
+                    let craterWidth = 40 + Math.random() * 60;
+                    let craterDepth = 20 + Math.random() * 30;
+                    for (let i = 0; i < craterWidth; i += 10) {
+                        if (x + i < WORLD_WIDTH) {
+                            let craterHeight = height + Math.sin((i / craterWidth) * Math.PI) * craterDepth;
+                            terrain.push({ x: x + i, y: craterHeight });
+                        }
+                    }
+                    x += craterWidth;
+                } else {
+                    terrain.push({ x: x, y: height });
+                }
+            }
+        }
+
+
+        
+        function initStars() {
+            stars = [];
+            for (let i = 0; i < 100; i++) {
+                stars.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height * 0.8,
+                    brightness: Math.random()
+                });
+            }
+        }
+        
+        function startGame() {
+            playerName = document.getElementById('playerName').value || 'Anonymous';
+            document.getElementById('startScreen').style.display = 'none';
+            gameState = 'playing';
+            resetGameVars();
+            initTerrain();
+            initStars();
+            gameLoop(0);
+        }
+        
+        function resetGameVars() {
+            gameTime = 0;
+            score = 0;
+            lives = 3;
+            bombs = 3;
+            shield = 100;
+            lastBossTime = 0;
+            shootTimer = 0;
+            player.x = 100;
+            player.y = 300;
+            player.vx = 0;
+            player.vy = 0;
+            bullets = [];
+            enemies = [];
+            explosions = [];
+            powerUps = [];
+        }
+        
+        function resetGame() {
+            document.getElementById('gameOverScreen').style.display = 'none';
+            document.getElementById('startScreen').style.display = 'block';
+            gameState = 'start';
+        }
+        
+        function shoot() {
+            bullets.push({
+                x: player.x + player.width,
+                y: player.y + player.height / 2,
+                vx: 8,
+                vy: 0,
+                type: 'laser',
+                width: 12,
+                height: 3
+            });
+        }
+        
+        function dropBomb() {
+            if (bombs > 0) {
+                bombs--;
+                bullets.push({
+                    x: player.x,
+                    y: player.y + player.height,
+                    vx: 0,
+                    vy: 3,
+                    type: 'bomb',
+                    width: 8,
+                    height: 8
+                });
+            }
+        }
+        
+        function getTerrainHeight(x) {
+            for (let i = 0; i < terrain.length - 1; i++) {
+                if (x >= terrain[i].x && x <= terrain[i + 1].x) {
+                    return terrain[i].y;
+                }
+            }
+            return 450;
+        }
+        
+        function spawnEnemy() {
+            let enemyTypes = ['fighter', 'bomber', 'dinosaur'];
+            // Start with extremely low spawn rate, increase very gradually
+            let baseSpawnChance = Math.min(0.001 + gameTime * 0.00002, 0.04); // Much lower starting rate
+            // Add progressive difficulty: increase spawn rate over time
+            let difficultyMultiplier = 1 + Math.floor(gameTime / 60000) * 0.2; // Slower increase
+            let spawnChance = Math.min(baseSpawnChance * difficultyMultiplier, 0.08); // Lower max rate
+
+            // Limit dinosaurs on screen - very restrictive at start
+            let currentDinosaurs = enemies.filter(e => e.type === 'dinosaur').length;
+            let maxDinosaurs = gameTime < 15000 ? 0 : // First 15 seconds: NO dinosaurs
+                              gameTime < 45000 ? 1 : // Next 30 seconds: max 1 dinosaur
+                              gameTime < 90000 ? 2 : // Next 45 seconds: max 2 dinosaurs
+                              3; // After that: max 3 dinosaurs
+
+            if (Math.random() < spawnChance) {
+                let type = enemyTypes[Math.floor(Math.random() * enemyTypes.length)];
+
+                // Don't spawn dinosaur if we've reached the limit
+                if (type === 'dinosaur' && currentDinosaurs >= maxDinosaurs) {
+                    type = enemyTypes[Math.floor(Math.random() * 2)]; // Pick fighter or bomber instead
+                }
+
+                let spawnX = cameraX + canvas.width + 50;
+                let enemy = {
+                    type: type,
+                    x: spawnX,
+                    y: type === 'dinosaur' ? getTerrainHeight(spawnX) - 35 : Math.random() * (canvas.height - 200),
+                    width: type === 'dinosaur' ? 45 : type === 'boss' ? 80 : 25,
+                    height: type === 'dinosaur' ? 35 : type === 'boss' ? 60 : 20,
+                    vx: -1.5 - Math.random() * 1 - Math.floor(gameTime / 30000) * 0.3, // Slower dinosaurs, faster over time
+                    vy: 0,
+                    health: type === 'dinosaur' ? 3 + Math.floor(gameTime / 45000) : 1 + Math.floor(gameTime / 60000), // More health over time
+                    shootTimer: 0,
+                    walkTimer: type === 'dinosaur' ? Math.random() * 100 : 0 // For walking animation
+                };
+                enemies.push(enemy);
+            }
+
+            // Boss spawn interval decreases over time
+            let bossInterval = Math.max(20000 - Math.floor(gameTime / 60000) * 3000, 10000);
+            if (gameTime - lastBossTime > bossInterval) {
+                let spawnX = cameraX + canvas.width + 100;
+                enemies.push({
+                    type: 'boss',
+                    x: spawnX,
+                    y: canvas.height / 2 - 40,
+                    width: 80,
+                    height: 60,
+                    vx: -1 - Math.floor(gameTime / 60000) * 0.3, // Faster bosses
+                    vy: 0,
+                    health: 10 + Math.floor(gameTime / 45000) * 5, // More health for bosses
+                    shootTimer: 0,
+                    moveTimer: 0
+                });
+                lastBossTime = gameTime;
+            }
+        }
+        
+        function updatePlayer() {
+            if (keys['ArrowLeft']) player.vx = Math.max(player.vx - 0.6, -player.maxSpeed);
+            if (keys['ArrowRight']) player.vx = Math.min(player.vx + 0.6, player.maxSpeed);
+            if (keys['ArrowUp']) player.vy = Math.max(player.vy - 0.6, -player.maxSpeed);
+            if (keys['ArrowDown']) player.vy = Math.min(player.vy + 0.6, player.maxSpeed);
+
+            if (keys[' '] && gameState === 'playing') {
+                shootTimer++;
+                if (shootTimer >= shootDelay) {
+                    shoot();
+                    shootTimer = 0;
+                }
+            } else {
+                shootTimer = 0;
+            }
+
+            player.vx *= 0.92;
+            player.vy *= 0.92;
+            player.x += player.vx;
+            player.y += player.vy;
+
+            // World looping: when player reaches end of world, loop back to beginning
+            if (player.x > WORLD_WIDTH - canvas.width / 2) {
+                player.x = canvas.width / 2; // Reset to beginning
+                cameraX = 0;
+            } else if (player.x < canvas.width / 2) {
+                player.x = WORLD_WIDTH - canvas.width / 2; // Reset to end
+                cameraX = WORLD_WIDTH - canvas.width;
+            } else {
+                // Update camera to follow player horizontally within world bounds
+                cameraX = Math.max(0, Math.min(WORLD_WIDTH - canvas.width, player.x - canvas.width / 2));
+            }
+
+            // Keep player within reasonable bounds vertically
+            if (player.y < 0) player.y = 0;
+            if (player.y > canvas.height - player.height) player.y = canvas.height - player.height;
+        }
+        
+        function updateBullets() {
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                let bullet = bullets[i];
+                bullet.x += bullet.vx;
+                bullet.y += bullet.vy;
+
+                // Remove bullets that are far off screen (accounting for world coordinates)
+                if (bullet.x > cameraX + canvas.width + 100 || bullet.x < cameraX - 100 || bullet.y > canvas.height + 50) {
+                    bullets.splice(i, 1);
+                    continue;
+                }
+
+                if (bullet.type === 'bomb' && bullet.y > getTerrainHeight(bullet.x) - 10) {
+                    createExplosion(bullet.x, bullet.y, 60);
+                    enemies.forEach(enemy => {
+                        let dist = Math.sqrt((enemy.x + enemy.width/2 - bullet.x) ** 2 + (enemy.y + enemy.height/2 - bullet.y) ** 2);
+                        if (dist < 80) {
+                            enemy.health -= 3;
+                        }
+                    });
+                    bullets.splice(i, 1);
+                }
+            }
+        }
+        
+        function updateEnemies() {
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                let enemy = enemies[i];
+                enemy.x += enemy.vx;
+                enemy.y += enemy.vy;
+                
+                if (enemy.type === 'boss') {
+                    enemy.moveTimer++;
+                    enemy.vy = Math.sin(enemy.moveTimer * 0.05) * 2;
+                }
+                
+                enemy.shootTimer++;
+                // Enemies shoot dramatically less frequently for beginner-friendly experience
+                let shootDelay = gameTime < 30000 ? 300 + Math.random() * 200 : // First 30 seconds: very slow shooting (5-8.3 seconds)
+                                gameTime < 60000 ? 240 + Math.random() * 120 :   // Next 30 seconds: slow shooting (4-6 seconds)
+                                gameTime < 120000 ? 180 + Math.random() * 90 :   // Next 60 seconds: moderate shooting (3-4.5 seconds)
+                                120 + Math.random() * 60;                        // After that: normal shooting (2-3 seconds)
+                
+                if (enemy.shootTimer > shootDelay) {
+                    if (enemy.type !== 'dinosaur' || enemy.y > canvas.height - 100) {
+                        bullets.push({
+                            x: enemy.x,
+                            y: enemy.y + enemy.height / 2,
+                            vx: -2, // Slower enemy bullets
+                            vy: 0,
+                            type: 'enemy',
+                            width: 6,
+                            height: 6
+                        });
+                    }
+                    enemy.shootTimer = 0;
+                }
+                
+                if (enemy.x < -100 || enemy.health <= 0) {
+                    if (enemy.health <= 0) {
+                        createExplosion(enemy.x + enemy.width/2, enemy.y + enemy.height/2, enemy.type === 'boss' ? 80 : 40);
+                        score += enemy.type === 'boss' ? 500 : enemy.type === 'dinosaur' ? 150 : 100;
+                        
+                        if (Math.random() < (enemy.type === 'boss' ? 1 : 0.3)) {
+                            spawnPowerUp(enemy.x, enemy.y, enemy.type === 'boss');
+                        }
+                    }
+                    enemies.splice(i, 1);
+                }
+            }
+        }
+        
+        function spawnPowerUp(x, y, isBoss) {
+            let types = ['bombs', 'shield'];
+            if (isBoss) types.push('life');
+
+            let type = types[Math.floor(Math.random() * types.length)];
+
+            powerUps.push({
+                x: x,
+                y: y,
+                type: type,
+                vy: 0, // Start with no vertical velocity (hovering)
+                timer: 0,
+                hoverTimer: 0,
+                hoverDuration: 240 + Math.random() * 120, // 4-6 seconds at 60fps (240-360 frames)
+                width: 16,
+                height: 16
+            });
+        }
+        
+        function updatePowerUps() {
+            for (let i = powerUps.length - 1; i >= 0; i--) {
+                let powerUp = powerUps[i];
+                powerUp.hoverTimer++;
+
+                // After hover duration, start falling
+                if (powerUp.hoverTimer >= powerUp.hoverDuration) {
+                    powerUp.vy = 2; // Start falling
+                }
+
+                powerUp.y += powerUp.vy;
+                powerUp.timer++;
+
+                if (powerUp.y > canvas.height || powerUp.timer > 600) { // Extended lifetime for falling
+                    powerUps.splice(i, 1);
+                    continue;
+                }
+
+                if (checkCollision(player, powerUp)) {
+                    switch (powerUp.type) {
+                        case 'bombs':
+                            bombs = Math.min(bombs + 3, 9);
+                            break;
+                        case 'shield':
+                            shield = Math.min(shield + 25, 100);
+                            break;
+                        case 'life':
+                            lives++;
+                            break;
+                    }
+                    score += 50;
+                    powerUps.splice(i, 1);
+                }
+            }
+        }
+        
+        function checkCollision(a, b) {
+            return a.x < b.x + b.width &&
+                   a.x + a.width > b.x &&
+                   a.y < b.y + b.height &&
+                   a.y + a.height > b.y;
+        }
+        
+        function checkCollisions() {
+            // Bullet vs enemy collisions
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                let bullet = bullets[i];
+                if (bullet.type === 'enemy') continue;
+                
+                for (let j = enemies.length - 1; j >= 0; j--) {
+                    let enemy = enemies[j];
+                    if (checkCollision(bullet, enemy)) {
+                        enemy.health--;
+                        if (bullet.type === 'laser') {
+                            bullets.splice(i, 1);
+                        }
+                        createExplosion(bullet.x, bullet.y, 25);
+                        break;
+                    }
+                }
+            }
+            
+            // Enemy bullet vs player
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                let bullet = bullets[i];
+                if (bullet.type !== 'enemy') continue;
+                
+                if (checkCollision(bullet, player)) {
+                    shield -= 10;
+                    bullets.splice(i, 1);
+                    createExplosion(player.x + player.width/2, player.y + player.height/2, 30);
+                }
+            }
+            
+            enemies.forEach(enemy => {
+                if (checkCollision(enemy, player)) {
+                    shield -= 20;
+                    createExplosion(player.x + player.width/2, player.y + player.height/2, 40);
+                    enemy.health = 0;
+                }
+            });
+            
+            if (shield <= 0) {
+                lives--;
+                shield = 100;
+                if (lives <= 0) {
+                    gameOver();
+                }
+            }
+        }
+        
+        function createExplosion(x, y, size) {
+            explosions.push({
+                x: x,
+                y: y,
+                size: size,
+                timer: 0,
+                maxTimer: 20
+            });
+        }
+        
+        function updateExplosions() {
+            for (let i = explosions.length - 1; i >= 0; i--) {
+                let explosion = explosions[i];
+                explosion.timer++;
+                if (explosion.timer >= explosion.maxTimer) {
+                    explosions.splice(i, 1);
+                }
+            }
+        }
+        
+        function gameOver() {
+            gameState = 'gameOver';
+            let finalScore = score + Math.floor(gameTime / 1000) * 10;
+            document.getElementById('finalScore').textContent = `Final Score: ${finalScore}`;
+            document.getElementById('playerNameDisplay').textContent = `Player: ${playerName}`;
+            document.getElementById('gameOverScreen').style.display = 'block';
+        }
+        
+        function draw() {
+            // Clear with solid background
+            ctx.fillStyle = '#282a36';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.save();
+            ctx.translate(-cameraX, 0);
+
+            // Draw stars
+            ctx.fillStyle = '#8be9fd';
+            stars.forEach(star => {
+                ctx.globalAlpha = star.brightness * 0.7;
+                ctx.fillRect(star.x + cameraX, star.y, 1, 1);
+            });
+            ctx.globalAlpha = 1;
+
+            // Draw terrain
+            ctx.strokeStyle = '#ffb86c';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            terrain.forEach((point, i) => {
+                if (i === 0) ctx.moveTo(point.x, point.y);
+                else ctx.lineTo(point.x, point.y);
+            });
+            ctx.stroke();
+
+            ctx.fillStyle = '#bd93f9';
+            ctx.beginPath();
+            terrain.forEach((point, i) => {
+                if (i === 0) ctx.moveTo(point.x, point.y);
+                else ctx.lineTo(point.x, point.y);
+            });
+            ctx.lineTo(canvas.width + cameraX, canvas.height);
+            ctx.lineTo(cameraX, canvas.height);
+            ctx.closePath();
+            ctx.fill();
+            
+            // Draw player as triangle ship
+            ctx.save();
+            ctx.translate(player.x + player.width/2, player.y + player.height/2);
+            ctx.fillStyle = '#50fa7b';
+            ctx.beginPath();
+            ctx.moveTo(15, 0);
+            ctx.lineTo(-10, -8);
+            ctx.lineTo(-5, 0);
+            ctx.lineTo(-10, 8);
+            ctx.closePath();
+            ctx.fill();
+            
+            // Engine glow
+            ctx.fillStyle = '#ff5555';
+            ctx.beginPath();
+            ctx.moveTo(-5, -3);
+            ctx.lineTo(-15, 0);
+            ctx.lineTo(-5, 3);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+            
+            // Draw enemies with proper vector graphics
+            enemies.forEach(enemy => {
+                ctx.save();
+                
+                if (enemy.type === 'dinosaur') {
+                    ctx.translate(enemy.x, enemy.y);
+                    
+                    // Draw proper dinosaur
+                    ctx.fillStyle = '#50fa7b';
+
+                    // Body (main oval)
+                    ctx.beginPath();
+                    ctx.ellipse(20, 25, 18, 12, 0, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Head (triangular)
+                    ctx.beginPath();
+                    ctx.moveTo(35, 15);
+                    ctx.lineTo(45, 10);
+                    ctx.lineTo(40, 25);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // Eye
+                    ctx.fillStyle = '#ffffff';
+                    ctx.beginPath();
+                    ctx.arc(42, 15, 2, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = '#000000';
+                    ctx.beginPath();
+                    ctx.arc(42, 15, 1, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Spikes on back
+                    ctx.fillStyle = '#50fa7b';
+                    for (let i = 0; i < 5; i++) {
+                        ctx.beginPath();
+                        ctx.moveTo(5 + i * 6, 15);
+                        ctx.lineTo(8 + i * 6, 8);
+                        ctx.lineTo(11 + i * 6, 15);
+                        ctx.closePath();
+                        ctx.fill();
+                    }
+
+                    // Legs (thicker)
+                    ctx.strokeStyle = '#50fa7b';
+                    ctx.lineWidth = 4;
+                    ctx.beginPath();
+                    ctx.moveTo(12, 35);
+                    ctx.lineTo(12, 45);
+                    ctx.moveTo(28, 35);
+                    ctx.lineTo(28, 45);
+                    ctx.stroke();
+
+                    // Feet
+                    ctx.fillStyle = '#50fa7b';
+                    ctx.fillRect(8, 45, 8, 4);
+                    ctx.fillRect(24, 45, 8, 4);
+
+                    // Tail
+                    ctx.beginPath();
+                    ctx.moveTo(2, 25);
+                    ctx.lineTo(-8, 20);
+                    ctx.lineTo(-5, 30);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // Gun turret on back
+                    ctx.fillStyle = '#6272a4';
+                    ctx.fillRect(15, 18, 8, 6);
+
+                    // Gun barrel
+                    ctx.strokeStyle = '#6272a4';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.moveTo(23, 21);
+                    ctx.lineTo(30, 21);
+                    ctx.stroke();
+                    
+                } else if (enemy.type === 'fighter') {
+                    ctx.translate(enemy.x + enemy.width/2, enemy.y + enemy.height/2);
+                    
+                    ctx.fillStyle = '#ff5555';
+                    ctx.beginPath();
+                    ctx.moveTo(8, 0);
+                    ctx.lineTo(-8, -6);
+                    ctx.lineTo(-8, 6);
+                    ctx.closePath();
+                    ctx.fill();
+                    
+                    // Wings
+                    ctx.fillStyle = '#ff7979';
+                    ctx.beginPath();
+                    ctx.moveTo(-4, -6);
+                    ctx.lineTo(-12, -12);
+                    ctx.lineTo(-8, -6);
+                    ctx.closePath();
+                    ctx.fill();
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(-4, 6);
+                    ctx.lineTo(-12, 12);
+                    ctx.lineTo(-8, 6);
+                    ctx.closePath();
+                    ctx.fill();
+                    
+                } else if (enemy.type === 'bomber') {
+                    ctx.translate(enemy.x + enemy.width/2, enemy.y + enemy.height/2);
+                    
+                    ctx.fillStyle = '#ffb86c';
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 8, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // Wings
+                    ctx.fillStyle = '#f1c40f';
+                    ctx.fillRect(-12, -3, 8, 6);
+                    ctx.fillRect(4, -8, 6, 16);
+                    
+                } else if (enemy.type === 'boss') {
+                    ctx.translate(enemy.x + enemy.width/2, enemy.y + enemy.height/2);
+                    
+                    ctx.fillStyle = '#ff5555';
+                    ctx.fillRect(-30, -20, 60, 40);
+                    
+                    ctx.fillStyle = '#bd93f9';
+                    ctx.fillRect(-25, -15, 15, 30);
+                    ctx.fillRect(10, -15, 15, 30);
+                    
+                    ctx.fillStyle = '#f1c40f';
+                    ctx.fillRect(-35, -8, 8, 6);
+                    ctx.fillRect(-35, 2, 8, 6);
+                    
+                    ctx.strokeStyle = '#6272a4';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.moveTo(30, -10);
+                    ctx.lineTo(40, -10);
+                    ctx.moveTo(30, 0);
+                    ctx.lineTo(40, 0);
+                    ctx.moveTo(30, 10);
+                    ctx.lineTo(40, 10);
+                    ctx.stroke();
+                }
+                
+                ctx.restore();
+            });
+            
+            // Draw bullets
+            bullets.forEach(bullet => {
+                if (bullet.type === 'laser') {
+                    ctx.strokeStyle = '#8be9fd';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.moveTo(bullet.x, bullet.y);
+                    ctx.lineTo(bullet.x + 12, bullet.y);
+                    ctx.stroke();
+                    
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(bullet.x, bullet.y);
+                    ctx.lineTo(bullet.x + 12, bullet.y);
+                    ctx.stroke();
+                } else if (bullet.type === 'bomb') {
+                    ctx.fillStyle = '#f1c40f';
+                    ctx.beginPath();
+                    ctx.arc(bullet.x, bullet.y, 4, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    ctx.fillStyle = '#ff5555';
+                    ctx.beginPath();
+                    ctx.arc(bullet.x - 2, bullet.y - 4, 2, 0, Math.PI * 2);
+                    ctx.fill();
+                } else {
+                    ctx.fillStyle = '#ff5555';
+                    ctx.beginPath();
+                    ctx.arc(bullet.x, bullet.y, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            });
+            
+            // Draw explosions
+            explosions.forEach(explosion => {
+                let progress = explosion.timer / explosion.maxTimer;
+                let size = explosion.size * (1 - progress);
+                
+                ctx.fillStyle = `rgba(255, 85, 85, ${1 - progress})`;
+                ctx.beginPath();
+                ctx.arc(explosion.x, explosion.y, size / 2, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.fillStyle = `rgba(255, 184, 108, ${1 - progress})`;
+                ctx.beginPath();
+                ctx.arc(explosion.x, explosion.y, size / 3, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            
+            // Draw power-ups
+            powerUps.forEach(powerUp => {
+                let flash = Math.sin(powerUp.timer * 0.3) > 0;
+                if (flash) {
+                    ctx.save();
+                    ctx.translate(powerUp.x + 8, powerUp.y + 8);
+                    
+                    switch (powerUp.type) {
+                        case 'bombs':
+                            ctx.fillStyle = '#f1c40f';
+                            ctx.beginPath();
+                            ctx.arc(0, 0, 8, 0, Math.PI * 2);
+                            ctx.fill();
+                            ctx.fillStyle = '#282a36';
+                            ctx.font = '12px monospace';
+                            ctx.textAlign = 'center';
+                            ctx.fillText('B', 0, 4);
+                            break;
+                        case 'shield':
+                            ctx.strokeStyle = '#8be9fd';
+                            ctx.lineWidth = 3;
+                            ctx.beginPath();
+                            ctx.arc(0, 0, 8, 0, Math.PI * 2);
+                            ctx.stroke();
+                            break;
+                        case 'life':
+                            ctx.fillStyle = '#50fa7b';
+                            ctx.beginPath();
+                            ctx.moveTo(0, -8);
+                            ctx.lineTo(-6, 8);
+                            ctx.lineTo(6, 8);
+                            ctx.closePath();
+                            ctx.fill();
+                            break;
+                    }
+                    ctx.restore();
+                }
+            });
+
+            ctx.restore(); // Restore camera translation
+        }
+        
+        function updateUI() {
+            document.getElementById('score').textContent = score;
+            document.getElementById('lives').textContent = lives;
+            document.getElementById('bombs').textContent = bombs;
+            document.getElementById('shield').textContent = Math.max(0, shield);
+            document.getElementById('time').textContent = Math.floor(gameTime / 1000);
+
+            // Draw power meter
+            const powerMeterCanvas = document.getElementById('powerMeter');
+            const pmCtx = powerMeterCanvas.getContext('2d');
+
+            // Clear power meter
+            pmCtx.fillStyle = '#282a36';
+            pmCtx.fillRect(0, 0, powerMeterCanvas.width, powerMeterCanvas.height);
+
+            // Draw power meter background
+            pmCtx.strokeStyle = '#6272a4';
+            pmCtx.lineWidth = 2;
+            pmCtx.strokeRect(2, 2, powerMeterCanvas.width - 4, powerMeterCanvas.height - 4);
+
+            // Draw power level
+            const powerPercent = Math.max(0, shield) / 100;
+            const barWidth = (powerMeterCanvas.width - 8) * powerPercent;
+
+            // Color based on health level
+            if (shield > 60) {
+                pmCtx.fillStyle = '#50fa7b'; // Green for good health
+            } else if (shield > 30) {
+                pmCtx.fillStyle = '#ffb86c'; // Yellow for medium health
+            } else {
+                pmCtx.fillStyle = '#ff5555'; // Red for low health
+            }
+
+            pmCtx.fillRect(4, 4, barWidth, powerMeterCanvas.height - 8);
+        }
+        
+        function gameLoop(currentTime) {
+            if (gameState !== 'playing') return;
+
+            let deltaTime = currentTime - lastTime;
+            lastTime = currentTime;
+            gameTime += deltaTime;
+
+            updatePlayer();
+            updateBullets();
+            updateEnemies();
+            updatePowerUps();
+            updateExplosions();
+            checkCollisions();
+            spawnEnemy();
+
+            draw();
+            updateUI();
+
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // Initialize
+        initTerrain();
+        initStars();
+    </script>
+</body>
+</html>
