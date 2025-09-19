@@ -16,11 +16,20 @@
     background: linear-gradient(to bottom, #282a36 0%, #21222c 50%, #191a21 100%);
   }
   #ui { position: absolute; top: 10px; left: 10px; z-index: 10; }
+  #topRight {
+    position: absolute; top: 10px; right: 10px; z-index: 10; text-align: right;
+    font-weight: bold;
+  }
   #startScreen, #gameOverScreen {
     position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
     text-align: center; z-index: 20; background: rgba(40,42,54,0.9);
-    padding: 20px; border: 2px solid #6272a4; border-radius: 8px;
+    padding: 20px; border: 2px solid #6272a4; border-radius: 8px; width: min(520px, 90vw);
   }
+  #leaderboard, #gameOverLeaderboard {
+    margin-top: 12px; text-align: left; max-height: 240px; overflow: auto;
+    border: 1px solid #6272a4; padding: 8px; border-radius: 6px; background: rgba(20,21,28,0.4);
+  }
+  #leaderboard h3, #gameOverLeaderboard h3 { margin: 0 0 8px 0; }
   input { background: #44475a; border: 1px solid #6272a4; color: #f8f8f2; padding: 5px; margin: 10px; }
   button { background: #44475a; border: 1px solid #6272a4; color: #f8f8f2; padding: 10px 20px; cursor: pointer; }
   button:hover { background: #6272a4; }
@@ -30,9 +39,10 @@
     position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
     text-align: center; z-index: 20; background: rgba(40,42,54,0.95);
     padding: 20px; border: 2px solid #6272a4; border-radius: 8px;
-    opacity: 0; transition: opacity 0.3s ease-in-out; display: none;
+    opacity: 0; transition: opacity 0.3s ease-in-out; display: none; width: min(640px, 95vw);
   }
   #shopScreen.show { opacity: 1; }
+  .upgrade { text-align: left; margin: 12px 0; padding: 10px; border: 1px dashed #6272a4; border-radius: 6px; }
 </style>
 </head>
 <body>
@@ -51,6 +61,10 @@
   </div>
 </div>
 
+<div id="topRight">
+  Ship Lv <span id="shipLevel">0</span>
+</div>
+
 <div id="startScreen">
   <h1>DEFENDER</h1>
   <p>Protect the planet from alien invaders!</p>
@@ -60,12 +74,21 @@
   <br /><br />
   <p>Controls:</p>
   <p>Arrow Keys: Move | Spacebar: Laser | B: Bomb | T: Torpedo (if purchased)</p>
+
+  <div id="leaderboard">
+    <h3>High Scores</h3>
+    <ol id="highScoreList"></ol>
+  </div>
 </div>
 
 <div id="gameOverScreen" style="display: none;">
   <h1>GAME OVER</h1>
   <p id="finalScore"></p>
   <p id="playerNameDisplay"></p>
+  <div id="gameOverLeaderboard">
+    <h3>High Scores</h3>
+    <ol id="gameOverScores"></ol>
+  </div>
   <button onclick="resetGame()">PLAY AGAIN</button>
 </div>
 
@@ -86,22 +109,23 @@ let playerName = '';
 let gameTime = 0;     // ms since run started
 let lastTime  = 0;    // last RAF timestamp
 let score = 0, lives = 3, bombs = 3, shield = 100;
-let lastBossTime = 0; // legacy boss timing
+let lastBossTime = 0;
 let cameraX = 0;
 let distanceTraveled = 0;
 let highScores = [];
 let gameSpeed = 1.0;
 
-let credits = 0;
-let lastShopTime = 0;
+/* ================== Upgrades (tiers 0..3) ================== */
 let upgrades = {
-  plasmaBlaster: false,
-  missiles: 0,          // 0..2
-  homingMissiles: 0,    // 0..2
-  bombCapacity: false,
-  torpedo: false        // NEW
+  plasma: 0,
+  missiles: 0,
+  homing: 0,
+  bombCapacity: 0,
+  torpedo: 0
 };
+function getShipLevel(){ return upgrades.plasma + upgrades.missiles + upgrades.homing + upgrades.bombCapacity + upgrades.torpedo; }
 
+/* ================== Audio ================== */
 let audioContext = null;
 let lastLaserTime = 0;
 function ensureAudio(){ if(!audioContext){ try{ audioContext=new (window.AudioContext||window.webkitAudioContext)(); }catch(_){} } }
@@ -115,8 +139,9 @@ let homingMissileTimerMs = 0;
 let torpedoTimerMs = 0; // cooldown timer
 const FRAME_MS = 16.67;
 const baseShootDelayMs = 8 * FRAME_MS;
+function plasmaShootDelay(){ return baseShootDelayMs * (upgrades.plasma ? [1.5, 1.35, 1.2][upgrades.plasma-1] : 1.0); }
 const homingMissileDelayMs = 24 * FRAME_MS;
-const torpedoCooldownMs = 1400; // ~1.4s between torpedoes
+function torpedoCooldownMs(){ return [Infinity, 1400, 1100, 900][upgrades.torpedo]; }
 
 document.addEventListener('keydown', (e)=>{
   keys[e.key] = true;
@@ -131,11 +156,12 @@ document.addEventListener('keydown', (e)=>{
 document.addEventListener('keyup', (e)=>{ keys[e.key] = false; });
 
 /* ================== Entities & World ================== */
+/* --- Ship tuned down slightly for smoother feel --- */
 let player = {
   x: 100, y: 300, width: 20, height: 16,
   vx: 0, vy: 0,
-  maxSpeed: 180,      // px/sec
-  accel: 360          // px/sec^2
+  maxSpeed: 150,      // was 180
+  accel: 300          // was 360
 };
 
 let bullets = [];
@@ -186,7 +212,7 @@ function getTerrainHeight(x){
 /* ------- Stars ------- */
 function initStars(){
   stars = [];
-  for (let i=0;i<120;i++){
+  for (let i=0;i<140;i++){ // a few more stars
     stars.push({
       x: Math.random()*canvas.width + cameraX,
       y: Math.random()*canvas.height*0.8,
@@ -204,6 +230,7 @@ function startGame(){
   gameState='playing';
   resetGameVars();
   initTerrain(); initStars();
+  renderHighScores('highScoreList');
   startMainLoop();
 }
 function resetGameVars(){
@@ -212,152 +239,193 @@ function resetGameVars(){
   player.x=100; player.y=300; player.vx=0; player.vy=0;
   bullets=[]; enemies=[]; explosions=[]; powerUps=[];
   cameraX=0; distanceTraveled=0; credits=0; lastShopTime=0;
-  lastSandwormTime = -1; // NEW boss timer
+  lastSandwormTime = -1;
+
+  upgrades = { plasma:0, missiles:0, homing:0, bombCapacity:0, torpedo:0 };
+  updateShipLevelUI();
 }
 function resetGame(){
   document.getElementById('gameOverScreen').style.display='none';
   document.getElementById('startScreen').style.display='block';
+  renderHighScores('highScoreList');
   gameState='start';
 }
 
 /* ================== Weapons ================== */
 function shoot(){
-  if (upgrades.plasmaBlaster){
-    bullets.push({ x: player.x+player.width, y: player.y+player.height/2, vx: 8, vy: 0, type:'plasma', width:20, height:6, damage:2 });
+  // Primary
+  if (upgrades.plasma>0){
+    const widths = [20, 24, 28];
+    const damages = [2, 3, 4];
+    const speeds  = [8, 9, 10];
+    const i = upgrades.plasma-1;
+    bullets.push({ x:player.x+player.width, y:player.y+player.height/2, vx:speeds[i], vy:0, type:'plasma', width:widths[i], height:6, damage:damages[i] });
   } else {
-    bullets.push({ x: player.x+player.width, y: player.y+player.height/2, vx: 12, vy: 0, type:'laser', width:12, height:3, damage:1 });
+    bullets.push({ x:player.x+player.width, y:player.y+player.height/2, vx:12, vy:0, type:'laser', width:12, height:3, damage:1 });
   }
+
+  // Missiles — now angled slightly downward out of the nose
   if (upgrades.missiles>=1){
-    bullets.push({ x:player.x+player.width, y:player.y+player.height/2+8, vx:6, vy:0, type:'missile', width:8, height:4, damage:3, tier:1 });
+    const dmg=[0,3,4,5][upgrades.missiles];
+    const add=upgrades.missiles;
+    const lanes=[-8,8,0];
+    for (let k=0;k<add;k++){
+      const off=lanes[k];
+      // noticeable downward angle; lower lane angles a bit more
+      const vyDown = 2 + (off===-8 ? 0.6 : off===0 ? 0.3 : 0.1);
+      bullets.push({
+        x: player.x+player.width,
+        y: player.y+player.height/2 + off,
+        vx: 6.2, vy: vyDown,               // <-- angled down
+        type:'missile', width:8, height:4, damage:dmg, tier:k+1
+      });
+    }
   }
-  if (upgrades.missiles>=2){
-    bullets.push({ x:player.x+player.width, y:player.y+player.height/2-8, vx:6, vy:0, type:'missile', width:8, height:4, damage:3, tier:2 });
-  }
+
   playLaserSound();
 }
 
 function shootHomingMissiles(){
-  if (upgrades.homingMissiles>=1){
-    let target=null, maxH=0;
-    enemies.forEach(e=>{ if (e.health>maxH){ maxH=e.health; target=e; } });
-    if (target){
-      let dx = (target.x+target.width/2) - (player.x+player.width);
-      let dy = (target.y+target.height/2) - (player.y+player.height/2);
-      let d = Math.hypot(dx,dy)||1, speed=5;
-      bullets.push({ x:player.x+player.width, y:player.y+player.height/2-8, vx:(dx/d)*speed, vy:(dy/d)*speed,
-        type:'homing', width:6, height:6, damage:2, target, tier:1 });
-    }
-  }
-  if (upgrades.homingMissiles>=2){
-    let target=null, best=Infinity;
-    enemies.forEach(e=>{
-      const healthy=(e.health===e.maxHealth)||e.health>5;
-      if (!healthy) return;
-      let dx=(e.x+e.width/2)-(player.x+player.width);
-      let dy=(e.y+e.height/2)-(player.y+player.height/2);
-      const d=Math.hypot(dx,dy); if (d<best){ best=d; target=e; }
-    });
-    if (target){
-      let dx = (target.x+target.width/2) - (player.x+player.width);
-      let dy = (target.y+target.height/2) - (player.y+player.height/2);
-      let d = Math.hypot(dx,dy)||1, speed=5;
-      bullets.push({ x:player.x+player.width, y:player.y+player.height/2+8, vx:(dx/d)*speed, vy:(dy/d)*speed,
-        type:'homing', width:6, height:6, damage:2, target, tier:2 });
-    }
+  const tier = upgrades.homing;
+  if (tier<=0) return;
+
+  const count = tier; // 1..3
+  const dmg = [0,2,3,4][tier];
+  const targets = [];
+
+  const strongest = enemies.slice().sort((a,b)=>b.health-a.health)[0];
+  if (strongest) targets.push(strongest);
+
+  const healthy = enemies.filter(e=>e.health===e.maxHealth || e.health>5);
+  const nearestHealthy = healthy.slice().sort((a,b)=>{
+    const da=Math.hypot(a.x-player.x, a.y-player.y);
+    const db=Math.hypot(b.x-player.x, b.y-player.y);
+    return da-db;
+  })[0];
+  if (nearestHealthy && !targets.includes(nearestHealthy)) targets.push(nearestHealthy);
+
+  const nearestOverall = enemies.slice().sort((a,b)=>{
+    const da=Math.hypot(a.x-player.x, a.y-player.y);
+    const db=Math.hypot(b.x-player.x, b.y-player.y);
+    return da-db;
+  })[0];
+  if (nearestOverall && !targets.includes(nearestOverall)) targets.push(nearestOverall);
+
+  for (let n=0;n<count;n++){
+    const target = targets[n] || strongest || nearestOverall;
+    if (!target) break;
+    let dx = (target.x+target.width/2) - (player.x+player.width);
+    let dy = (target.y+target.height/2) - (player.y+player.height/2);
+    let d = Math.hypot(dx,dy)||1, speed=5;
+    const yOff = [-8, 8, 0][n] || 0;
+    bullets.push({ x:player.x+player.width, y:player.y+player.height/2+yOff, vx:(dx/d)*speed, vy:(dy/d)*speed, type:'homing', width:6, height:6, damage:dmg, target });
   }
 }
 
 function dropBomb(){
   if (bombs>0){
     bombs--;
-    bullets.push({ x:player.x, y:player.y+player.height, vx:0, vy:5, type:'bomb', width:8, height:8, damage:3 });
+    const bombDmg=[3,4,5,6][upgrades.bombCapacity];
+    bullets.push({ x:player.x, y:player.y+player.height, vx:0, vy:5, type:'bomb', width:8, height:8, damage:bombDmg });
   }
 }
 
-/* --- NEW: Torpedo secondary weapon (T) --- */
 function fireTorpedo(){
-  if (!upgrades.torpedo || gameState!=='playing') return;
-  if (torpedoTimerMs > 0) return;
-  torpedoTimerMs = torpedoCooldownMs;
-  // Big electric torpedo: fast, high damage, small AoE on impact
-  bullets.push({
-    x: player.x + player.width,
-    y: player.y + player.height/2,
-    vx: 16, vy: 0,
-    type: 'torpedo',
-    width: 26, height: 10,
-    damage: 12,
-    pierce: 1 // can pass through 1 enemy before exploding
-  });
+  const tier = upgrades.torpedo;
+  if (tier<=0 || gameState!=='playing') return;
+  if (torpedoTimerMs>0) return;
+  torpedoTimerMs = torpedoCooldownMs();
+  const dmg=[0,12,16,20][tier];
+  const speed=[0,16,18,20][tier];
+  bullets.push({ x:player.x+player.width, y:player.y+player.height/2, vx:speed, vy:0, type:'torpedo', width:26+2*(tier-1), height:10+(tier-1), damage:dmg, pierce:tier-1 });
 }
 
 /* ================== Spawning ================== */
 // Progressive saucer scaling (every 35s)
 function getSaucerTier(){ return Math.floor(gameTime / 35000); }
 function saucerScaleForTier(tier){
-  // size +2%..+3% per tier (multiplicative)
   const sizeUp = 1 + (0.02 + Math.random()*0.01) * tier;
-  // health +20%..+30% per tier
   const hpUp = 1 + (0.20 + Math.random()*0.10) * tier;
-  // weapon +2%..+10% per tier
   const wepUp = 1 + (0.02 + Math.random()*0.08) * tier;
   return { sizeUp, hpUp, wepUp };
 }
 
+let credits = 0;
+let lastShopTime = 0;
 let lastSandwormTime = -1;
 const SANDWORM_FIRST_MS = 180000; // ~3 minutes
-const SANDWORM_COOLDOWN_MS = 90000; // every 1.5 minutes thereafter
+const SANDWORM_COOLDOWN_MS = 90000;
+
+// NEW: Bouncer enemy (zig-zag, wall bounces)
+function spawnBouncer(spawnX){
+  const size = 22;
+  const y = 60 + Math.random() * (canvas.height - 180);
+  enemies.push({
+    type:'bouncer',
+    x: spawnX, y,
+    width: size, height: size,
+    vx: -2.3,                   // deliberately slower
+    vy: (Math.random()<0.5? -1:1) * 1.4, // gentle vertical drift
+    health: 6 + Math.floor(gameTime/60000),
+    maxHealth: 6 + Math.floor(gameTime/60000),
+    shootTimerMs: 0
+  });
+}
 
 function spawnEnemy(deltaTime){
   const t = gameTime;
 
-  // Base flying/ground spawns (probabilistic per ms)
-  const basePerSec = Math.min(0.03 + t * 0.0000006, 2.4);
+  // MORE ENEMIES: increase spawn rate noticeably
+  const basePerSec = Math.min(0.08 + t * 0.0000012, 4.0); // was ~0.03..2.4
   const p = (basePerSec/1000) * deltaTime;
 
   // Dinosaur cap
   const dinos = enemies.filter(e=>e.type==='dinosaur').length;
-  const maxDinos = t<15000?0 : t<45000?1 : t<90000?2 : 3;
+  const maxDinos = t<15000?0 : t<45000?2 : t<90000?3 : 4;
 
   if (Math.random() < p){
-    let type = ['fighter','bomber','dinosaur'][Math.floor(Math.random()*3)];
-    if (type==='dinosaur' && dinos>=maxDinos) type = Math.random()<0.5 ? 'fighter' : 'bomber';
+    // include new 'bouncer' sometimes
+    let pool = ['fighter','bomber','dinosaur','bouncer','fighter','fighter'];
+    let type = pool[Math.floor(Math.random()*pool.length)];
+    if (type==='dinosaur' && dinos>=maxDinos) type = Math.random()<0.5 ? 'fighter' : 'bouncer';
 
     const spawnX = cameraX + canvas.width + 50;
-    // Base health
-    let enemyHealth = (type==='dinosaur') ? 8 + Math.floor(t/45000) : 1 + Math.floor(t/60000);
-    let w = (type==='dinosaur')?45:25;
-    let h = (type==='dinosaur')?35:20;
 
-    // Progressive saucer buffs (apply to fighters only)
-    let weaponScale = 1, tier = 0;
-    if (type==='fighter'){
-      tier = getSaucerTier();
-      const { sizeUp, hpUp, wepUp } = saucerScaleForTier(tier);
-      w = Math.round(w * sizeUp);
-      h = Math.round(h * sizeUp);
-      enemyHealth = Math.ceil(enemyHealth * hpUp);
-      weaponScale = wepUp;
+    if (type==='bouncer'){ spawnBouncer(spawnX); }
+    else {
+      let enemyHealth = (type==='dinosaur') ? 8 + Math.floor(t/45000) : 1 + Math.floor(t/60000);
+      let w = (type==='dinosaur')?45:25;
+      let h = (type==='dinosaur')?35:20;
+
+      let weaponScale = 1, tier = 0;
+      if (type==='fighter'){
+        tier = getSaucerTier();
+        const { sizeUp, hpUp, wepUp } = saucerScaleForTier(tier);
+        w = Math.round(w * sizeUp);
+        h = Math.round(h * sizeUp);
+        enemyHealth = Math.ceil(enemyHealth * hpUp);
+        weaponScale = wepUp;
+      }
+
+      enemies.push({
+        type, x: spawnX,
+        y: type==='dinosaur' ? getTerrainHeight(spawnX)-35 : Math.random()*(canvas.height-200),
+        width: (type==='boss')?80 : w,
+        height:(type==='boss')?60 : h,
+        vx: -2.4 - Math.random()*1 - Math.floor(t/60000)*0.15, // slightly faster flow overall
+        vy: 0,
+        health: enemyHealth,
+        maxHealth: enemyHealth,
+        shootTimerMs: 0,
+        walkTimer: type==='dinosaur'? Math.random()*100 : 0,
+        moveTimer: 0,
+        tier,
+        weaponScale
+      });
     }
-
-    enemies.push({
-      type, x: spawnX,
-      y: type==='dinosaur' ? getTerrainHeight(spawnX)-35 : Math.random()*(canvas.height-200),
-      width: (type==='boss')?80 : w,
-      height:(type==='boss')?60 : h,
-      vx: -2.0 - Math.random()*1 - Math.floor(t/60000)*0.15,
-      vy: 0,
-      health: enemyHealth,
-      maxHealth: enemyHealth,
-      shootTimerMs: 0,
-      walkTimer: type==='dinosaur'? Math.random()*100 : 0,
-      moveTimer: 0,
-      tier,
-      weaponScale
-    });
   }
 
-  // Legacy boss timer (optional keep)
+  // Legacy mini-boss
   const bossInterval = Math.max(20000 - Math.floor(t/60000)*3000, 10000);
   if (t - lastBossTime > bossInterval){
     const spawnX = cameraX + canvas.width + 100;
@@ -373,7 +441,7 @@ function spawnEnemy(deltaTime){
     lastBossTime = t;
   }
 
-  // NEW: Sand Worm boss
+  // Sand Worm boss
   if ((t >= SANDWORM_FIRST_MS) && (lastSandwormTime < 0 || t - lastSandwormTime >= SANDWORM_COOLDOWN_MS)){
     spawnSandworm();
     lastSandwormTime = t;
@@ -381,18 +449,16 @@ function spawnEnemy(deltaTime){
 }
 
 function spawnSandworm(){
-  // Single big boss that patrols screen perimeter clockwise
-  const hp = 300 + Math.floor(gameTime/60000)*80; // scales a bit over time
+  const hp = 300 + Math.floor(gameTime/60000)*80;
   enemies.push({
     type: 'sandworm',
     x: cameraX + canvas.width/2, y: canvas.height - 80,
     width: 120, height: 40,
     vx: 0, vy: 0,
     health: hp, maxHealth: hp,
-    tParam: 0,                 // 0..1 along perimeter
-    speedPerSec: 0.08,         // fraction of perimeter per second
+    tParam: 0, speedPerSec: 0.08,
     shootTimerMs: 0,
-    weaponScale: 1 + Math.min(gameTime/600000, 0.5), // grows slowly
+    weaponScale: 1 + Math.min(gameTime/600000, 0.5),
     segmentCount: 8
   });
 }
@@ -420,14 +486,15 @@ function updatePlayer(dt, deltaTime){
   if (keys[' '] && gameState==='playing'){
     shootTimerMs += deltaTime;
     homingMissileTimerMs += deltaTime;
-    let currentShootDelay = upgrades.plasmaBlaster ? baseShootDelayMs*1.5 : baseShootDelayMs;
-    if (shootTimerMs>=currentShootDelay){ shoot(); shootTimerMs=0; }
-    if (homingMissileTimerMs>=homingMissileDelayMs){ shootHomingMissiles(); homingMissileTimerMs=0; }
+    const currDelay = plasmaShootDelay();
+    if (shootTimerMs>=currDelay){ shoot(); shootTimerMs=0; }
+    if (upgrades.homing>0 && homingMissileTimerMs>=homingMissileDelayMs){ shootHomingMissiles(); homingMissileTimerMs=0; }
   } else { shootTimerMs=0; homingMissileTimerMs=0; }
 
-  if (torpedoTimerMs>0) torpedoTimerMs = Math.max(0, torpedoTimerMs - deltaTime);
+  if (upgrades.torpedo>0 && torpedoTimerMs>0) torpedoTimerMs = Math.max(0, torpedoTimerMs - deltaTime);
 
-  const damp = Math.pow(0.92, dt*60);
+  // slightly stronger smoothing (less jitter)
+  const damp = Math.pow(0.88, dt*60); // was 0.92
   player.vx *= damp; player.vy *= damp;
 
   if (player.vx>0) distanceTraveled += player.vx * dt;
@@ -448,13 +515,11 @@ function updateBullets(dt, deltaTime){
   for (let i=bullets.length-1;i>=0;i--){
     let b = bullets[i];
 
-    // Lifetimes for enemy homing (to prevent eternal orbit)
+    // Enemy homing lifetime (prevent eternal orbit)
     if (b.type==='enemyHoming'){
       b.lifeMs = (b.lifeMs||0) + deltaTime;
-      if (!b.maxLifeMs) b.maxLifeMs = 4000 + Math.random()*3000; // 4-7s
-      if (b.lifeMs >= b.maxLifeMs){
-        bullets.splice(i,1); continue;
-      }
+      if (!b.maxLifeMs) b.maxLifeMs = 4000 + Math.random()*3000;
+      if (b.lifeMs >= b.maxLifeMs){ bullets.splice(i,1); continue; }
     }
 
     // Homing adjust
@@ -493,7 +558,6 @@ function updateBullets(dt, deltaTime){
     }
 
     if (b.type==='torpedo'){
-      // add a faint electric wobble
       b.y += Math.sin((b.x+b.y)*0.05)*0.4;
     }
   }
@@ -520,52 +584,54 @@ function updateEnemies(dt, deltaTime){
       if (e.y>targetY+10) e.y=targetY+10;
     }
 
-    // NEW: Sandworm perimeter patrol
+    // Bouncer: bounce off vertical bounds and "ceiling/floor" edges
+    if (e.type==='bouncer'){
+      const top = 40, bottom = canvas.height - 80;
+      if (e.y < top){ e.y = top; e.vy = Math.abs(e.vy); }
+      if (e.y > bottom){ e.y = bottom; e.vy = -Math.abs(e.vy); }
+      // slight horizontal wobble to feel alive
+      e.vx += (Math.sin((e.x+e.y)*0.01) * 0.06) * dt * 60;
+      // clamp to keep it slow-ish
+      if (e.vx < -3.2) e.vx = -3.2;
+      if (e.vx > -1.2) e.vx = -1.2;
+      // occasional shot
+      e.shootTimerMs = (e.shootTimerMs||0)+deltaTime;
+      if (e.shootTimerMs > 1400 + Math.random()*600){
+        e.shootTimerMs = 0;
+        bullets.push({ x:e.x, y:e.y+e.height/2, vx:-3.2, vy:0.6, type:'enemy', width:6, height:6, damage:10 });
+      }
+    }
+
+    // Sandworm perimeter patrol
     if (e.type==='sandworm'){
       e.tParam += e.speedPerSec * (deltaTime/1000); if (e.tParam>1) e.tParam-=1;
-      // perimeter path (clockwise) – param t in [0,1)
-      const m = 30; // margin from edges
+      const m = 30;
       const left = cameraX + m, right = cameraX + canvas.width - m;
       const top = m, bottom = canvas.height - m;
       const t = e.tParam;
       let px, py;
-      if (t < 0.25){ // top row
-        const u = t/0.25; px = left + (right-left)*u; py = top;
-      } else if (t < 0.5){ // right col
-        const u = (t-0.25)/0.25; px = right; py = top + (bottom-top)*u;
-      } else if (t < 0.75){ // bottom row
-        const u = (t-0.5)/0.25; px = right - (right-left)*u; py = bottom;
-      } else { // left col
-        const u = (t-0.75)/0.25; px = left; py = bottom - (bottom-top)*u;
-      }
-      e.x = px - e.width/2;
-      e.y = py - e.height/2;
+      if (t < 0.25){ const u=t/0.25; px=left+(right-left)*u; py=top; }
+      else if (t < 0.5){ const u=(t-0.25)/0.25; px=right; py=top+(bottom-top)*u; }
+      else if (t < 0.75){ const u=(t-0.5)/0.25; px=right-(right-left)*u; py=bottom; }
+      else { const u=(t-0.75)/0.25; px=left; py=bottom-(bottom-top)*u; }
+      e.x = px - e.width/2; e.y = py - e.height/2;
 
-      // fire at intervals
       e.shootTimerMs += deltaTime;
-      const sd = 900 - Math.min(gameTime/6000, 500); // gets a bit faster over time
+      const sd = 900 - Math.min(gameTime/6000, 500);
       if (e.shootTimerMs > sd){
         e.shootTimerMs = 0;
-        // bursts of missiles aimed at player
         const headX = e.x + e.width/2, headY = e.y + e.height/2;
         for (let k=0;k<2;k++){
           let dx = (player.x+player.width/2) - headX;
           let dy = (player.y+player.height/2) - headY;
           let d = Math.hypot(dx,dy)||1;
           const sp = 4.8 + Math.random()*0.8;
-          bullets.push({
-            x: headX, y: headY,
-            vx: (dx/d)*sp, vy: (dy/d)*sp,
-            type: 'enemyHoming',
-            width: 6, height: 6,
-            target: player,
-            damage: Math.round(10 * e.weaponScale)
-          });
+          bullets.push({ x: headX, y: headY, vx:(dx/d)*sp, vy:(dy/d)*sp, type:'enemyHoming', width:6, height:6, target:player, damage: Math.round(10 * e.weaponScale) });
         }
       }
     }
 
-    // Enemy shooting cadence
+    // Enemy shooting cadence (fighters scale by weaponScale)
     e.shootTimerMs = (e.shootTimerMs||0) + deltaTime;
     let sd;
     if (gameTime<30000) sd=5000+Math.random()*3300;
@@ -573,14 +639,12 @@ function updateEnemies(dt, deltaTime){
     else if (gameTime<120000) sd=3000+Math.random()*1500;
     else sd=2000+Math.random()*1000;
 
-    if (e.shootTimerMs > sd && e.type!=='sandworm'){ // worm handles its own fire
+    if (e.shootTimerMs > sd && e.type!=='sandworm' && e.type!=='bouncer'){
       if (e.type==='dinosaur'){
         let dx=player.x+player.width/2-e.x, dy=player.y+player.height/2-e.y;
         let d=Math.hypot(dx,dy)||1; let sp=4.5;
-        bullets.push({ x:e.x, y:e.y+e.height/2, vx:(dx/d)*sp, vy:(dy/d)*sp,
-          type:'enemyHoming', width:5, height:5, target:player, damage:10 });
+        bullets.push({ x:e.x, y:e.y+e.height/2, vx:(dx/d)*sp, vy:(dy/d)*sp, type:'enemyHoming', width:5, height:5, target:player, damage:10 });
       } else {
-        // Fighter/Bomber fire; fighters scale with tier weaponScale
         const baseSpeed = (e.type==='fighter') ? 3.2*e.weaponScale : 3.2;
         const dmg = (e.type==='fighter') ? Math.round(10 * e.weaponScale) : 10;
         bullets.push({ x:e.x, y:e.y+e.height/2, vx:-baseSpeed, vy:0, type:'enemy', width:6, height:6, damage:dmg });
@@ -588,8 +652,8 @@ function updateEnemies(dt, deltaTime){
       e.shootTimerMs = 0;
     }
 
-    // Cull and death
-    if (e.x < cameraX-100 || e.health<=0){
+    // Cull / death
+    if (e.x < cameraX-140 || e.health<=0){
       if (e.health<=0){
         createExplosion(e.x+e.width/2, e.y+e.height/2, e.type==='boss'||e.type==='sandworm'? 90:40);
         playExplosionSound();
@@ -597,11 +661,13 @@ function updateEnemies(dt, deltaTime){
           e.type==='sandworm' ? 120 :
           e.type==='boss' ? 50 :
           e.type==='dinosaur' ? 10 :
-          e.type==='bomber' ? 5 : 1;
+          e.type==='bomber' ? 5 :
+          e.type==='bouncer' ? 6 : 1;
         credits += enemyCredits;
         score += e.type==='sandworm' ? 1200 :
                  e.type==='boss' ? 500 :
-                 e.type==='dinosaur' ? 150 : 100;
+                 e.type==='dinosaur' ? 150 :
+                 e.type==='bouncer' ? 120 : 100;
         if (Math.random() < (e.type==='boss'||e.type==='sandworm' ? 1 : 0.3)) spawnPowerUp(e.x, e.y, (e.type==='boss'||e.type==='sandworm'));
       }
       enemies.splice(i,1);
@@ -628,7 +694,7 @@ function updatePowerUps(dt, deltaTime){
     p.x += p.vx*dt; p.y += p.vy*dt; p.timerMs=(p.timerMs||0)+deltaTime;
     if (p.y>canvas.height || p.timerMs>10000){ powerUps.splice(i,1); continue; }
     if (checkCollision(player,p)){
-      if (p.type==='bombs'){ const maxB = upgrades.bombCapacity?50:9; bombs = Math.min(bombs+3, maxB); }
+      if (p.type==='bombs'){ const caps=[9,20,35,50]; const cap=caps[upgrades.bombCapacity]; bombs = Math.min(bombs+3, cap); }
       if (p.type==='shield'){ shield = Math.min(shield+25, 100); }
       if (p.type==='life'){ lives++; }
       score += 50; playPowerUpSound(); powerUps.splice(i,1);
@@ -659,18 +725,17 @@ function checkCollisions(){
       let e=enemies[j];
       if (checkCollision(b,e)){
         e.health -= b.damage || 1;
-        // torpedo pierce/aoe
         if (b.type==='torpedo'){
-          if (b.pierce>0){ b.pierce--; } else {
+          if (b.pierce>0){ b.pierce--; }
+          else {
             createExplosion(b.x,b.y,70);
-            // small AoE splash
             enemies.forEach(en=>{
               const d=Math.hypot(en.x+en.width/2-b.x, en.y+en.height/2-b.y);
-              if (d<85) en.health -= 6;
+              if (d<85) en.health -= 6 + 2*(upgrades.torpedo-1);
             });
             bullets.splice(i,1);
           }
-        } else if (b.type==='laser' || b.type==='plasma'){
+        } else if (b.type==='laser' || b.type==='plasma' || b.type==='missile' || b.type==='homing'){
           bullets.splice(i,1);
         }
         createExplosion(b.x,b.y,25);
@@ -679,7 +744,7 @@ function checkCollisions(){
     }
   }
 
-  // Enemy bullets vs player (use bullet.damage if present)
+  // Enemy bullets vs player
   for (let i=bullets.length-1;i>=0;i--){
     const b=bullets[i];
     if (b.type!=='enemy' && b.type!=='enemyHoming') continue;
@@ -714,9 +779,10 @@ function gameOver(){
   gameState='gameOver';
   const parsecs = Math.floor(distanceTraveled/100);
   const finalScore = score + Math.floor(gameTime/1000)*10 + parsecs*5;
-  if (isHighScore(finalScore)){ addHighScore(playerName, finalScore); document.getElementById('finalScore').textContent=`NEW HIGH SCORE: ${finalScore}`; }
-  else { document.getElementById('finalScore').textContent=`Final Score: ${finalScore}`; }
+  addHighScore(playerName, finalScore);
+  document.getElementById('finalScore').textContent=`Final Score: ${finalScore}`;
   document.getElementById('playerNameDisplay').textContent=`Player: ${playerName} - ${parsecs} Parsecs Traveled`;
+  renderHighScores('gameOverScores');
   document.getElementById('gameOverScreen').style.display='block';
 }
 
@@ -728,7 +794,7 @@ function draw(){
   const parallax=0.4;
   ctx.fillStyle='#8be9fd';
   stars.forEach(s=>{
-    ctx.globalAlpha = s.brightness*0.7;
+    ctx.globalAlpha = s.brightness*1.0;
     const sx = s.x + cameraX*(1-parallax);
     ctx.fillRect(sx, s.y, 1, 1);
   });
@@ -759,7 +825,7 @@ function draw(){
       ctx.fillStyle='#50fa7b'; ctx.fillRect(8,12,2,3); ctx.fillRect(12,10,2,5); ctx.fillRect(16,8,2,7);
     } else if (e.type==='fighter'){
       ctx.fillStyle='#ff5555';
-      ctx.fillRect(6,8,Math.max(12, e.width-13),8); // scale a bit with width
+      ctx.fillRect(6,8,Math.max(12, e.width-13),8);
       ctx.fillRect(2,10,4,4); ctx.fillRect( (6+Math.max(12, e.width-13)),10,4,4);
       ctx.fillStyle='#ffb86c'; ctx.fillRect(10,6,4,4);
     } else if (e.type==='bomber'){
@@ -772,15 +838,23 @@ function draw(){
       ctx.fillStyle='#000000'; ctx.fillRect(16,25,8,2);
       ctx.fillStyle='#ff5555'; ctx.fillRect(12,10,1,5); ctx.fillRect(27,10,1,5);
     } else if (e.type==='sandworm'){
-      // draw segmented worm
       const seg = e.segmentCount||8;
       for (let s=0;s<seg;s++){
         const r = 12 - s*1.2;
         ctx.fillStyle = s===0 ? '#d2b48c' : '#bda16f';
         ctx.beginPath(); ctx.arc(e.width/2 - s*14, e.height/2, Math.max(4,r), 0, Math.PI*2); ctx.fill();
       }
-      // simple eye on head
       ctx.fillStyle='#000'; ctx.fillRect(e.width/2-4, e.height/2-4, 3,3);
+    } else if (e.type==='bouncer'){
+      // simple diamond that feels "bouncy"
+      ctx.fillStyle='#8be9fd';
+      ctx.beginPath();
+      ctx.moveTo(e.width/2, 0);
+      ctx.lineTo(e.width, e.height/2);
+      ctx.lineTo(e.width/2, e.height);
+      ctx.lineTo(0, e.height/2);
+      ctx.closePath();
+      ctx.fill();
     }
     ctx.restore();
   });
@@ -811,10 +885,8 @@ function draw(){
       ctx.fillStyle='#ff8c00'; ctx.beginPath(); ctx.arc(b.x,b.y,3,0,Math.PI*2); ctx.fill();
       ctx.fillStyle='#cc5500'; ctx.beginPath(); ctx.arc(b.x-2,b.y-2,1.5,0,Math.PI*2); ctx.fill();
     } else if (b.type==='torpedo'){
-      // big electric torpedo
       ctx.fillStyle='#8be9fd'; ctx.fillRect(b.x, b.y-b.height/2, b.width, b.height);
       ctx.strokeStyle='#bd93f9'; ctx.lineWidth=2; ctx.strokeRect(b.x, b.y-b.height/2, b.width, b.height);
-      // electric arcs
       ctx.strokeStyle='#ffffff'; ctx.lineWidth=1; ctx.beginPath();
       ctx.moveTo(b.x+4, b.y-6); ctx.lineTo(b.x+10, b.y-2); ctx.lineTo(b.x+16, b.y-6); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(b.x+6, b.y+6); ctx.lineTo(b.x+12, b.y+2); ctx.lineTo(b.x+18, b.y+6); ctx.stroke();
@@ -858,6 +930,7 @@ function updateUI(){
   document.getElementById('shield').textContent = Math.max(0, shield);
   document.getElementById('time').textContent = Math.floor(gameTime/1000);
   document.getElementById('distance').textContent = Math.floor(distanceTraveled/100);
+  updateShipLevelUI();
 
   const pm = document.getElementById('powerMeter');
   const pctx = pm.getContext('2d');
@@ -867,6 +940,8 @@ function updateUI(){
   pctx.fillStyle = shield>60 ? '#50fa7b' : shield>30 ? '#ffb86c' : '#ff5555';
   pctx.fillRect(4,4,w,pm.height-8);
 }
+
+function updateShipLevelUI(){ document.getElementById('shipLevel').textContent = getShipLevel(); }
 
 /* ================== Audio ================== */
 function playSound(freq, dur, type='square', vol=0.1){
@@ -883,73 +958,41 @@ function playExplosionSound(){ playSound(300,0.2,'sawtooth',0.08); setTimeout(()
 function playBombExplosionSound(){ playSound(100,0.3,'sawtooth',0.1); setTimeout(()=>playSound(80,0.2,'sawtooth',0.08),100); }
 function playPowerUpSound(){ playSound(400,0.1,'sine',0.06); setTimeout(()=>playSound(600,0.1,'sine',0.06),50); }
 
-/* ================== Shop ================== */
+/* ================== Shop (tiers to 3) ================== */
+let lastShopTime = 0;
+let credits = 0;
 function showShop(){
   gameState='shop'; lastShopTime=gameTime;
   document.getElementById('shopCredits').textContent = `Credits: ${credits}`;
   updateShopButtons();
   const s=document.getElementById('shopScreen'); s.style.display='block'; setTimeout(()=>s.classList.add('show'),10);
 }
+function tierLabel(name, tier){ return `${name} TIER ${tier} of 3`; }
 function updateShopButtons(){
   const c=document.getElementById('shopUpgrades'); c.innerHTML='';
-  if (!upgrades.plasmaBlaster){
-    c.innerHTML += `
-      <div class="upgrade" id="plasmaBlaster">
-        <h3>PLASMA BLASTER - 100 Credits</h3>
-        <p>Larger purple projectiles, reduced fire rate, increased damage</p>
-        <button onclick="purchaseUpgrade('plasmaBlaster')" ${credits>=100?'class="affordable"':''}>PURCHASE</button>
-      </div>`;
+  const add = (html)=>{ c.innerHTML += html; };
+
+  if (upgrades.plasma < 3){
+    const next=upgrades.plasma+1, cost=[0,100,200,350][next];
+    add(`<div class="upgrade"><h3>${tierLabel('PLASMA BLASTER', next)} - ${cost} Credits</h3><p>Stronger, larger plasma with faster bolts. Current: ${upgrades.plasma}/3</p><button onclick="purchaseUpgrade('plasma', ${cost})" ${credits>=cost?'class="affordable"':''}>${upgrades.plasma===0?'PURCHASE':'UPGRADE'}</button></div>`);
   }
-  if (upgrades.missiles<2){
-    if (upgrades.missiles===0){
-      c.innerHTML += `
-        <div class="upgrade" id="missiles">
-          <h3>MISSILES TIER 1 - 100 Credits</h3>
-          <p>White rockets below blaster, slower but high damage</p>
-          <button onclick="purchaseUpgrade('missiles')" ${credits>=100?'class="affordable"':''}>PURCHASE</button>
-        </div>`;
-    } else {
-      c.innerHTML += `
-        <div class="upgrade" id="missiles">
-          <h3>MISSILES TIER 2 - 200 Credits</h3>
-          <p>Second missile above blaster, same high damage</p>
-          <button onclick="purchaseUpgrade('missiles')" ${credits>=200?'class="affordable"':''}>UPGRADE</button>
-        </div>`;
-    }
+  if (upgrades.missiles < 3){
+    const next=upgrades.missiles+1, cost=[0,100,200,350][next];
+    add(`<div class="upgrade"><h3>${tierLabel('MISSILES', next)} - ${cost} Credits</h3><p>More rockets, angled nose launch. Current: ${upgrades.missiles}/3</p><button onclick="purchaseUpgrade('missiles', ${cost})" ${credits>=cost?'class="affordable"':''}>${upgrades.missiles===0?'PURCHASE':'UPGRADE'}</button></div>`);
   }
-  if (upgrades.homingMissiles<2){
-    if (upgrades.homingMissiles===0){
-      c.innerHTML += `
-        <div class="upgrade" id="homingMissiles">
-          <h3>HOMING MISSILES TIER 1 - 200 Credits</h3>
-          <p>Red projectiles that auto-target strongest enemy</p>
-          <button onclick="purchaseUpgrade('homingMissiles')" ${credits>=200?'class="affordable"':''}>PURCHASE</button>
-        </div>`;
-    } else {
-      c.innerHTML += `
-        <div class="upgrade" id="homingMissiles">
-          <h3>HOMING MISSILES TIER 2 - 400 Credits</h3>
-          <p>Second missile targets nearest healthy enemy</p>
-          <button onclick="purchaseUpgrade('homingMissiles')" ${credits>=400?'class="affordable"':''}>UPGRADE</button>
-        </div>`;
-    }
+  if (upgrades.homing < 3){
+    const next=upgrades.homing+1, cost=[0,200,400,600][next];
+    add(`<div class="upgrade"><h3>${tierLabel('HOMING MISSILES', next)} - ${cost} Credits</h3><p>More homers, better coverage. Current: ${upgrades.homing}/3</p><button onclick="purchaseUpgrade('homing', ${cost})" ${credits>=cost?'class="affordable"':''}>${upgrades.homing===0?'PURCHASE':'UPGRADE'}</button></div>`);
   }
-  if (!upgrades.bombCapacity){
-    c.innerHTML += `
-      <div class="upgrade" id="bombCapacity">
-        <h3>BOMB CAPACITY UPGRADE - 350 Credits</h3>
-        <p>Increase maximum bomb capacity from 9 to 50 bombs</p>
-        <button onclick="purchaseUpgrade('bombCapacity')" ${credits>=350?'class="affordable"':''}>PURCHASE</button>
-      </div>`;
+  if (upgrades.bombCapacity < 3){
+    const next=upgrades.bombCapacity+1, cost=[0,150,250,350][next];
+    const caps=[9,20,35,50];
+    add(`<div class="upgrade"><h3>${tierLabel('BOMB CAPACITY', next)} - ${cost} Credits</h3><p>Max bombs → ${caps[next]}. Current: ${upgrades.bombCapacity}/3</p><button onclick="purchaseUpgrade('bombCapacity', ${cost})" ${credits>=cost?'class="affordable"':''}>${upgrades.bombCapacity===0?'PURCHASE':'UPGRADE'}</button></div>`);
   }
-  // NEW: Torpedo upgrade
-  if (!upgrades.torpedo){
-    c.innerHTML += `
-      <div class="upgrade" id="torpedoUpgrade">
-        <h3>TORPEDO LAUNCHER - 300 Credits</h3>
-        <p>Unlocks <b>T</b>: fires a large electric torpedo with heavy damage & small AoE</p>
-        <button onclick="purchaseUpgrade('torpedo')" ${credits>=300?'class="affordable"':''}>PURCHASE</button>
-      </div>`;
+  if (upgrades.torpedo < 3){
+    const next=upgrades.torpedo+1, cost=[0,300,450,600][next];
+    const cds=['Locked','1.4s','1.1s','0.9s'];
+    add(`<div class="upgrade"><h3>${tierLabel('TORPEDO LAUNCHER', next)} - ${cost} Credits</h3><p>Unlock/boost T: damage up, cooldown ${cds[next]}.</p><button onclick="purchaseUpgrade('torpedo', ${cost})" ${credits>=cost?'class="affordable"':''}>${upgrades.torpedo===0?'PURCHASE':'UPGRADE'}</button></div>`);
   }
 }
 function closeShop(){
@@ -962,30 +1005,47 @@ function closeShop(){
     startMainLoop();
   },300);
 }
-function purchaseUpgrade(which){
-  let cost=0, ok=false;
-  if (which==='plasmaBlaster'){ cost=100; ok=!upgrades.plasmaBlaster && credits>=cost; }
-  else if (which==='missiles'){ cost = upgrades.missiles===0?100:200; ok=upgrades.missiles<2 && credits>=cost; }
-  else if (which==='homingMissiles'){ cost = upgrades.homingMissiles===0?200:400; ok=upgrades.homingMissiles<2 && credits>=cost; }
-  else if (which==='bombCapacity'){ cost=350; ok=!upgrades.bombCapacity && credits>=cost; }
-  else if (which==='torpedo'){ cost=300; ok=!upgrades.torpedo && credits>=cost; }
-  if (ok){
-    credits -= cost;
-    if (which==='plasmaBlaster') upgrades.plasmaBlaster=true;
-    else if (which==='missiles') upgrades.missiles++;
-    else if (which==='homingMissiles') upgrades.homingMissiles++;
-    else if (which==='bombCapacity') upgrades.bombCapacity=true;
-    else if (which==='torpedo') upgrades.torpedo=true;
-    document.getElementById('shopCredits').textContent=`Credits: ${credits}`;
-    updateShopButtons();
-  }
+function purchaseUpgrade(which, cost){
+  if (credits < cost) return;
+  if (which==='plasma' && upgrades.plasma>=3) return;
+  if (which==='missiles' && upgrades.missiles>=3) return;
+  if (which==='homing' && upgrades.homing>=3) return;
+  if (which==='bombCapacity' && upgrades.bombCapacity>=3) return;
+  if (which==='torpedo' && upgrades.torpedo>=3) return;
+
+  credits -= cost;
+  upgrades[which] += 1;
+  updateShipLevelUI();
+  document.getElementById('shopCredits').textContent=`Credits: ${credits}`;
+  updateShopButtons();
 }
 
-/* ================== Scores ================== */
-function loadHighScores(){ const s=localStorage.getItem('defenderHighScores'); highScores = s? JSON.parse(s):[]; }
-function saveHighScores(){ localStorage.setItem('defenderHighScores', JSON.stringify(highScores)); }
-function addHighScore(name,score){ highScores.push({name,score}); highScores.sort((a,b)=>b.score-a.score); highScores=highScores.slice(0,10); saveHighScores(); }
-function isHighScore(score){ return highScores.length<10 || score>highScores[highScores.length-1].score; }
+/* ================== Scores (localStorage) ================== */
+function loadHighScores(){
+  const s=localStorage.getItem('defenderHighScores');
+  try { highScores = s? JSON.parse(s):[]; if (!Array.isArray(highScores)) highScores = []; }
+  catch { highScores = []; }
+}
+function saveHighScores(){
+  try { localStorage.setItem('defenderHighScores', JSON.stringify(highScores)); }
+  catch {}
+}
+function addHighScore(name,score){
+  highScores.push({ name, score });
+  highScores.sort((a,b)=> b.score - a.score);
+  highScores = highScores.slice(0,10);
+  saveHighScores();
+}
+function renderHighScores(listId){
+  const ol = document.getElementById(listId);
+  if (!ol) return;
+  ol.innerHTML = '';
+  highScores.forEach((hs, idx)=>{
+    const li = document.createElement('li');
+    li.textContent = `${idx+1}. ${hs.name || 'Anonymous'} — ${hs.score}`;
+    ol.appendChild(li);
+  });
+}
 
 /* ================== Loop ================== */
 function gameLoop(now){
@@ -1017,7 +1077,8 @@ function gameLoop(now){
 
 /* ================== Init ================== */
 function initAudio(){ /* deferred to interaction */ }
-loadHighScores(); initTerrain(); initStars(); initAudio();
+loadHighScores(); renderHighScores('highScoreList');
+initTerrain(); initStars(); initAudio();
 </script>
 </body>
 </html>
