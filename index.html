@@ -1,1500 +1,1023 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Defender - Space Shooter</title>
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            background: #282a36;
-            color: #f8f8f2;
-            font-family: 'Courier New', monospace;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-        }
-        #gameCanvas {
-            border: 2px solid #44475a;
-            background: linear-gradient(to bottom, #282a36 0%, #21222c 50%, #191a21 100%);
-        }
-        #ui {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            z-index: 10;
-        }
-        #startScreen, #gameOverScreen {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            text-align: center;
-            z-index: 20;
-            background: rgba(40, 42, 54, 0.9);
-            padding: 20px;
-            border: 2px solid #6272a4;
-            border-radius: 8px;
-        }
-        input {
-            background: #44475a;
-            border: 1px solid #6272a4;
-            color: #f8f8f2;
-            padding: 5px;
-            margin: 10px;
-        }
-        button {
-            background: #44475a;
-            border: 1px solid #6272a4;
-            color: #f8f8f2;
-            padding: 10px 20px;
-            cursor: pointer;
-        }
-        button:hover {
-            background: #6272a4;
-        }
-        button.affordable {
-            background: #50fa7b;
-            color: #282a36;
-        }
-        button.affordable:hover {
-            background: #7bfaad;
-        }
-        #shopScreen {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            text-align: center;
-            z-index: 20;
-            background: rgba(40, 42, 54, 0.95);
-            padding: 20px;
-            border: 2px solid #6272a4;
-            border-radius: 8px;
-            opacity: 0;
-            transition: opacity 0.3s ease-in-out;
-        }
-        #shopScreen.show {
-            opacity: 1;
-        }
-    </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Defender - Space Shooter</title>
+<style>
+  body {
+    margin: 0; padding: 0;
+    background: #282a36; color: #f8f8f2;
+    font-family: 'Courier New', monospace;
+    display: flex; justify-content: center; align-items: center; height: 100vh;
+  }
+  #gameCanvas {
+    border: 2px solid #44475a;
+    background: linear-gradient(to bottom, #282a36 0%, #21222c 50%, #191a21 100%);
+  }
+  #ui { position: absolute; top: 10px; left: 10px; z-index: 10; }
+  #startScreen, #gameOverScreen {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    text-align: center; z-index: 20; background: rgba(40,42,54,0.9);
+    padding: 20px; border: 2px solid #6272a4; border-radius: 8px;
+  }
+  input { background: #44475a; border: 1px solid #6272a4; color: #f8f8f2; padding: 5px; margin: 10px; }
+  button { background: #44475a; border: 1px solid #6272a4; color: #f8f8f2; padding: 10px 20px; cursor: pointer; }
+  button:hover { background: #6272a4; }
+  button.affordable { background: #50fa7b; color: #282a36; }
+  button.affordable:hover { background: #7bfaad; }
+  #shopScreen {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    text-align: center; z-index: 20; background: rgba(40,42,54,0.95);
+    padding: 20px; border: 2px solid #6272a4; border-radius: 8px;
+    opacity: 0; transition: opacity 0.3s ease-in-out; display: none;
+  }
+  #shopScreen.show { opacity: 1; }
+</style>
 </head>
 <body>
-    <canvas id="gameCanvas" width="1200" height="600"></canvas>
-    
-    <div id="ui">
-        <div>Score: <span id="score">0</span></div>
-        <div>Lives: <span id="lives">3</span></div>
-        <div>Bombs: <span id="bombs">3</span></div>
-        <div>Shield: <span id="shield">100</span>%</div>
-        <div>Time: <span id="time">0</span>s</div>
-        <div>Parsecs: <span id="distance">0</span></div>
-        <div style="margin-top: 10px;">
-            <div style="color: #50fa7b; font-size: 12px;">POWER</div>
-            <canvas id="powerMeter" width="100" height="20" style="border: 1px solid #6272a4; background: #282a36;"></canvas>
-        </div>
-    </div>
+<canvas id="gameCanvas" width="1200" height="600"></canvas>
 
-    <div id="startScreen">
-        <h1>DEFENDER</h1>
-        <p>Protect the planet from alien invaders!</p>
-        <input type="text" id="playerName" placeholder="Enter your name" maxlength="20">
-        <br>
-        <button onclick="startGame()">START GAME</button>
-        <br><br>
-        <p>Controls:</p>
-        <p>Arrow Keys: Move | Spacebar: Laser | B: Bomb</p>
-    </div>
+<div id="ui">
+  <div>Score: <span id="score">0</span></div>
+  <div>Lives: <span id="lives">3</span></div>
+  <div>Bombs: <span id="bombs">3</span></div>
+  <div>Shield: <span id="shield">100</span>%</div>
+  <div>Time: <span id="time">0</span>s</div>
+  <div>Parsecs: <span id="distance">0</span></div>
+  <div style="margin-top: 10px;">
+    <div style="color: #50fa7b; font-size: 12px;">POWER</div>
+    <canvas id="powerMeter" width="100" height="20" style="border: 1px solid #6272a4; background: #282a36;"></canvas>
+  </div>
+</div>
 
-    <div id="gameOverScreen" style="display: none;">
-        <h1>GAME OVER</h1>
-        <p id="finalScore"></p>
-        <p id="playerNameDisplay"></p>
-        <button onclick="resetGame()">PLAY AGAIN</button>
-    </div>
+<div id="startScreen">
+  <h1>DEFENDER</h1>
+  <p>Protect the planet from alien invaders!</p>
+  <input type="text" id="playerName" placeholder="Enter your name" maxlength="20" />
+  <br />
+  <button onclick="startGame()">START GAME</button>
+  <br /><br />
+  <p>Controls:</p>
+  <p>Arrow Keys: Move | Spacebar: Laser | B: Bomb | T: Torpedo (if purchased)</p>
+</div>
 
-    <div id="shopScreen" style="display: none;">
-        <h1>UPGRADE SHOP</h1>
-        <p id="shopCredits">Credits: 0</p>
-        <div id="shopUpgrades">
-            <div class="upgrade" id="plasmaBlaster">
-                <h3>PLASMA BLASTER - 100 Credits</h3>
-                <p>Larger purple projectiles, reduced fire rate, increased damage</p>
-                <button onclick="purchaseUpgrade('plasmaBlaster')">PURCHASE</button>
-            </div>
-            <div class="upgrade" id="missiles">
-                <h3>MISSILES - 100 Credits</h3>
-                <p>White rockets below blaster, slower but high damage</p>
-                <button onclick="purchaseUpgrade('missiles')">PURCHASE</button>
-            </div>
-            <div class="upgrade" id="homingMissiles">
-                <h3>HOMING MISSILES - 200 Credits</h3>
-                <p>Red projectiles that auto-target strongest enemy</p>
-                <button onclick="purchaseUpgrade('homingMissiles')">PURCHASE</button>
-            </div>
-        </div>
-        <button onclick="closeShop()">CONTINUE GAME</button>
-    </div>
+<div id="gameOverScreen" style="display: none;">
+  <h1>GAME OVER</h1>
+  <p id="finalScore"></p>
+  <p id="playerNameDisplay"></p>
+  <button onclick="resetGame()">PLAY AGAIN</button>
+</div>
 
-    <script>
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
-        
-        let gameState = 'start';
-        let playerName = '';
-        let gameTime = 0;
-        let lastTime = 0;
-        let score = 0;
-        let lives = 3;
-        let bombs = 3;
-        let shield = 100;
-        let lastBossTime = 0;
-        let cameraX = 0;
-        let distanceTraveled = 0; // Track distance in pixels
-        let highScores = [];
-        let gameSpeed = 1.0; // Start at normal speed, can increase
+<div id="shopScreen">
+  <h1>UPGRADE SHOP</h1>
+  <p id="shopCredits">Credits: 0</p>
+  <div id="shopUpgrades"></div>
+  <button onclick="closeShop()">CONTINUE GAME</button>
+</div>
 
-        // Upgrade system
-        let credits = 0;
-        let lastShopTime = 0;
-        let upgrades = {
-            plasmaBlaster: false,
-            missiles: 0, // 0 = none, 1 = tier 1, 2 = tier 2
-            homingMissiles: 0, // 0 = none, 1 = tier 1, 2 = tier 2
-            bombCapacity: false // false = 9 max, true = 50 max
-        };
+<script>
+/* ================== Canvas & Core ================== */
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
 
-        // Audio system
-        let audioContext = null;
-        let lastLaserTime = 0;
-        
-        // Input handling
-        let keys = {};
-        let shootTimer = 0;
-        let homingMissileTimer = 0;
-        const shootDelay = 8;
-        const homingMissileDelay = 24; // Slower firing rate for homing missiles (3x slower)
-        
-        // Game objects
-        let player = {
-            x: 100,
-            y: 300,
-            width: 20,
-            height: 16,
-            vx: 0,
-            vy: 0,
-            maxSpeed: 3 // Slower for beginners
-        };
-        
-        let bullets = [];
-        let enemies = [];
-        let explosions = [];
-        let powerUps = [];
-        let stars = [];
-        let terrain = [];
-        
-        // Event listeners
-        document.addEventListener('keydown', (e) => {
-            keys[e.key] = true;
-            if (e.key === ' ') e.preventDefault();
-            if (e.key && e.key.toLowerCase() === 'b' && gameState === 'playing') {
-                dropBomb();
-            }
-            if (e.key === 'Enter') {
-                if (gameState === 'start') {
-                    startGame();
-                } else if (gameState === 'shop') {
-                    closeShop();
-                }
-            }
+let gameState = 'start';
+let playerName = '';
+let gameTime = 0;     // ms since run started
+let lastTime  = 0;    // last RAF timestamp
+let score = 0, lives = 3, bombs = 3, shield = 100;
+let lastBossTime = 0; // legacy boss timing
+let cameraX = 0;
+let distanceTraveled = 0;
+let highScores = [];
+let gameSpeed = 1.0;
+
+let credits = 0;
+let lastShopTime = 0;
+let upgrades = {
+  plasmaBlaster: false,
+  missiles: 0,          // 0..2
+  homingMissiles: 0,    // 0..2
+  bombCapacity: false,
+  torpedo: false        // NEW
+};
+
+let audioContext = null;
+let lastLaserTime = 0;
+function ensureAudio(){ if(!audioContext){ try{ audioContext=new (window.AudioContext||window.webkitAudioContext)(); }catch(_){} } }
+document.addEventListener('keydown', ensureAudio, { once:true });
+document.addEventListener('click', ensureAudio, { once:true });
+
+/* ================== Input ================== */
+let keys = {};
+let shootTimerMs = 0;
+let homingMissileTimerMs = 0;
+let torpedoTimerMs = 0; // cooldown timer
+const FRAME_MS = 16.67;
+const baseShootDelayMs = 8 * FRAME_MS;
+const homingMissileDelayMs = 24 * FRAME_MS;
+const torpedoCooldownMs = 1400; // ~1.4s between torpedoes
+
+document.addEventListener('keydown', (e)=>{
+  keys[e.key] = true;
+  if (e.key === ' ') e.preventDefault();
+  if (e.key && e.key.toLowerCase() === 'b' && gameState === 'playing') dropBomb();
+  if (e.key && e.key.toLowerCase() === 't' && gameState === 'playing') fireTorpedo();
+  if (e.key === 'Enter'){
+    if (gameState === 'start') startGame();
+    else if (gameState === 'shop') closeShop();
+  }
+});
+document.addEventListener('keyup', (e)=>{ keys[e.key] = false; });
+
+/* ================== Entities & World ================== */
+let player = {
+  x: 100, y: 300, width: 20, height: 16,
+  vx: 0, vy: 0,
+  maxSpeed: 180,      // px/sec
+  accel: 360          // px/sec^2
+};
+
+let bullets = [];
+let enemies = [];
+let explosions = [];
+let powerUps = [];
+let stars = [];
+let terrain = [];
+
+let terrainGeneratedUpTo = 0;
+
+/* ------- Terrain ------- */
+function initTerrain(){ terrain=[]; generateTerrainSegment(0, canvas.width*3); }
+function generateTerrainSegment(startX, endX){
+  for (let x=startX; x<endX; x+=10){
+    let h = 450 + Math.sin(x*0.02)*20 + Math.sin(x*0.005)*40;
+    if (Math.random()<0.1){
+      let w = 40 + Math.random()*60, d = 20 + Math.random()*30;
+      for (let i=0;i<w;i+=10){
+        if (x+i < endX){
+          let ch = h + Math.sin((i/w)*Math.PI)*d;
+          terrain.push({x:x+i, y:ch});
+        }
+      }
+      x += w;
+    } else {
+      terrain.push({x, y:h});
+    }
+  }
+  terrainGeneratedUpTo = endX;
+}
+function getTerrainHeight(x){
+  if (terrain.length < 2) return 450;
+  let lo=0, hi=terrain.length-2;
+  while (lo<=hi){
+    const mid=(lo+hi)>>1;
+    const ax=terrain[mid].x, bx=terrain[mid+1].x;
+    if (x<ax) hi=mid-1;
+    else if (x>bx) lo=mid+1;
+    else {
+      const t=(x-ax)/((bx-ax)||1);
+      return terrain[mid].y*(1-t)+terrain[mid+1].y*t;
+    }
+  }
+  return 450;
+}
+
+/* ------- Stars ------- */
+function initStars(){
+  stars = [];
+  for (let i=0;i<120;i++){
+    stars.push({
+      x: Math.random()*canvas.width + cameraX,
+      y: Math.random()*canvas.height*0.8,
+      brightness: Math.random()
+    });
+  }
+}
+
+/* ================== Game Flow ================== */
+function startMainLoop(){ lastTime=performance.now(); requestAnimationFrame(gameLoop); }
+
+function startGame(){
+  playerName = document.getElementById('playerName').value || 'Anonymous';
+  document.getElementById('startScreen').style.display='none';
+  gameState='playing';
+  resetGameVars();
+  initTerrain(); initStars();
+  startMainLoop();
+}
+function resetGameVars(){
+  gameTime=0; score=0; lives=3; bombs=3; shield=100;
+  lastBossTime=0; shootTimerMs=0; homingMissileTimerMs=0; torpedoTimerMs=0;
+  player.x=100; player.y=300; player.vx=0; player.vy=0;
+  bullets=[]; enemies=[]; explosions=[]; powerUps=[];
+  cameraX=0; distanceTraveled=0; credits=0; lastShopTime=0;
+  lastSandwormTime = -1; // NEW boss timer
+}
+function resetGame(){
+  document.getElementById('gameOverScreen').style.display='none';
+  document.getElementById('startScreen').style.display='block';
+  gameState='start';
+}
+
+/* ================== Weapons ================== */
+function shoot(){
+  if (upgrades.plasmaBlaster){
+    bullets.push({ x: player.x+player.width, y: player.y+player.height/2, vx: 8, vy: 0, type:'plasma', width:20, height:6, damage:2 });
+  } else {
+    bullets.push({ x: player.x+player.width, y: player.y+player.height/2, vx: 12, vy: 0, type:'laser', width:12, height:3, damage:1 });
+  }
+  if (upgrades.missiles>=1){
+    bullets.push({ x:player.x+player.width, y:player.y+player.height/2+8, vx:6, vy:0, type:'missile', width:8, height:4, damage:3, tier:1 });
+  }
+  if (upgrades.missiles>=2){
+    bullets.push({ x:player.x+player.width, y:player.y+player.height/2-8, vx:6, vy:0, type:'missile', width:8, height:4, damage:3, tier:2 });
+  }
+  playLaserSound();
+}
+
+function shootHomingMissiles(){
+  if (upgrades.homingMissiles>=1){
+    let target=null, maxH=0;
+    enemies.forEach(e=>{ if (e.health>maxH){ maxH=e.health; target=e; } });
+    if (target){
+      let dx = (target.x+target.width/2) - (player.x+player.width);
+      let dy = (target.y+target.height/2) - (player.y+player.height/2);
+      let d = Math.hypot(dx,dy)||1, speed=5;
+      bullets.push({ x:player.x+player.width, y:player.y+player.height/2-8, vx:(dx/d)*speed, vy:(dy/d)*speed,
+        type:'homing', width:6, height:6, damage:2, target, tier:1 });
+    }
+  }
+  if (upgrades.homingMissiles>=2){
+    let target=null, best=Infinity;
+    enemies.forEach(e=>{
+      const healthy=(e.health===e.maxHealth)||e.health>5;
+      if (!healthy) return;
+      let dx=(e.x+e.width/2)-(player.x+player.width);
+      let dy=(e.y+e.height/2)-(player.y+player.height/2);
+      const d=Math.hypot(dx,dy); if (d<best){ best=d; target=e; }
+    });
+    if (target){
+      let dx = (target.x+target.width/2) - (player.x+player.width);
+      let dy = (target.y+target.height/2) - (player.y+player.height/2);
+      let d = Math.hypot(dx,dy)||1, speed=5;
+      bullets.push({ x:player.x+player.width, y:player.y+player.height/2+8, vx:(dx/d)*speed, vy:(dy/d)*speed,
+        type:'homing', width:6, height:6, damage:2, target, tier:2 });
+    }
+  }
+}
+
+function dropBomb(){
+  if (bombs>0){
+    bombs--;
+    bullets.push({ x:player.x, y:player.y+player.height, vx:0, vy:5, type:'bomb', width:8, height:8, damage:3 });
+  }
+}
+
+/* --- NEW: Torpedo secondary weapon (T) --- */
+function fireTorpedo(){
+  if (!upgrades.torpedo || gameState!=='playing') return;
+  if (torpedoTimerMs > 0) return;
+  torpedoTimerMs = torpedoCooldownMs;
+  // Big electric torpedo: fast, high damage, small AoE on impact
+  bullets.push({
+    x: player.x + player.width,
+    y: player.y + player.height/2,
+    vx: 16, vy: 0,
+    type: 'torpedo',
+    width: 26, height: 10,
+    damage: 12,
+    pierce: 1 // can pass through 1 enemy before exploding
+  });
+}
+
+/* ================== Spawning ================== */
+// Progressive saucer scaling (every 35s)
+function getSaucerTier(){ return Math.floor(gameTime / 35000); }
+function saucerScaleForTier(tier){
+  // size +2%..+3% per tier (multiplicative)
+  const sizeUp = 1 + (0.02 + Math.random()*0.01) * tier;
+  // health +20%..+30% per tier
+  const hpUp = 1 + (0.20 + Math.random()*0.10) * tier;
+  // weapon +2%..+10% per tier
+  const wepUp = 1 + (0.02 + Math.random()*0.08) * tier;
+  return { sizeUp, hpUp, wepUp };
+}
+
+let lastSandwormTime = -1;
+const SANDWORM_FIRST_MS = 180000; // ~3 minutes
+const SANDWORM_COOLDOWN_MS = 90000; // every 1.5 minutes thereafter
+
+function spawnEnemy(deltaTime){
+  const t = gameTime;
+
+  // Base flying/ground spawns (probabilistic per ms)
+  const basePerSec = Math.min(0.03 + t * 0.0000006, 2.4);
+  const p = (basePerSec/1000) * deltaTime;
+
+  // Dinosaur cap
+  const dinos = enemies.filter(e=>e.type==='dinosaur').length;
+  const maxDinos = t<15000?0 : t<45000?1 : t<90000?2 : 3;
+
+  if (Math.random() < p){
+    let type = ['fighter','bomber','dinosaur'][Math.floor(Math.random()*3)];
+    if (type==='dinosaur' && dinos>=maxDinos) type = Math.random()<0.5 ? 'fighter' : 'bomber';
+
+    const spawnX = cameraX + canvas.width + 50;
+    // Base health
+    let enemyHealth = (type==='dinosaur') ? 8 + Math.floor(t/45000) : 1 + Math.floor(t/60000);
+    let w = (type==='dinosaur')?45:25;
+    let h = (type==='dinosaur')?35:20;
+
+    // Progressive saucer buffs (apply to fighters only)
+    let weaponScale = 1, tier = 0;
+    if (type==='fighter'){
+      tier = getSaucerTier();
+      const { sizeUp, hpUp, wepUp } = saucerScaleForTier(tier);
+      w = Math.round(w * sizeUp);
+      h = Math.round(h * sizeUp);
+      enemyHealth = Math.ceil(enemyHealth * hpUp);
+      weaponScale = wepUp;
+    }
+
+    enemies.push({
+      type, x: spawnX,
+      y: type==='dinosaur' ? getTerrainHeight(spawnX)-35 : Math.random()*(canvas.height-200),
+      width: (type==='boss')?80 : w,
+      height:(type==='boss')?60 : h,
+      vx: -2.0 - Math.random()*1 - Math.floor(t/60000)*0.15,
+      vy: 0,
+      health: enemyHealth,
+      maxHealth: enemyHealth,
+      shootTimerMs: 0,
+      walkTimer: type==='dinosaur'? Math.random()*100 : 0,
+      moveTimer: 0,
+      tier,
+      weaponScale
+    });
+  }
+
+  // Legacy boss timer (optional keep)
+  const bossInterval = Math.max(20000 - Math.floor(t/60000)*3000, 10000);
+  if (t - lastBossTime > bossInterval){
+    const spawnX = cameraX + canvas.width + 100;
+    const bossHealth = 10 + Math.floor(t/45000)*5;
+    enemies.push({
+      type:'boss', x:spawnX,
+      y: canvas.height/2 - 40 + (Math.random()*120 - 60),
+      width:80, height:60,
+      vx: -1 - Math.floor(t/120000)*0.15, vy:0,
+      health: bossHealth, maxHealth: bossHealth,
+      shootTimerMs: 0, moveTimer: 0, tier:0, weaponScale:1.0
+    });
+    lastBossTime = t;
+  }
+
+  // NEW: Sand Worm boss
+  if ((t >= SANDWORM_FIRST_MS) && (lastSandwormTime < 0 || t - lastSandwormTime >= SANDWORM_COOLDOWN_MS)){
+    spawnSandworm();
+    lastSandwormTime = t;
+  }
+}
+
+function spawnSandworm(){
+  // Single big boss that patrols screen perimeter clockwise
+  const hp = 300 + Math.floor(gameTime/60000)*80; // scales a bit over time
+  enemies.push({
+    type: 'sandworm',
+    x: cameraX + canvas.width/2, y: canvas.height - 80,
+    width: 120, height: 40,
+    vx: 0, vy: 0,
+    health: hp, maxHealth: hp,
+    tParam: 0,                 // 0..1 along perimeter
+    speedPerSec: 0.08,         // fraction of perimeter per second
+    shootTimerMs: 0,
+    weaponScale: 1 + Math.min(gameTime/600000, 0.5), // grows slowly
+    segmentCount: 8
+  });
+}
+
+/* ================== Power-ups ================== */
+function spawnPowerUp(x,y,isBoss){
+  let types = ['bombs','shield']; if (isBoss) types.push('life');
+  let type = types[Math.floor(Math.random()*types.length)];
+  powerUps.push({
+    x,y, vx:0, vy:0, type,
+    timerMs:0, hoverTimerMs:0,
+    hoverDurationMs: (480+Math.random()*240)*FRAME_MS,
+    width:16, height:16
+  });
+}
+
+/* ================== Updates ================== */
+function updatePlayer(dt, deltaTime){
+  const acc = player.accel * dt;
+  if (keys['ArrowLeft'])  player.vx = Math.max(player.vx - acc, -player.maxSpeed);
+  if (keys['ArrowRight']) player.vx = Math.min(player.vx + acc,  player.maxSpeed);
+  if (keys['ArrowUp'])    player.vy = Math.max(player.vy - acc, -player.maxSpeed);
+  if (keys['ArrowDown'])  player.vy = Math.min(player.vy + acc,  player.maxSpeed);
+
+  if (keys[' '] && gameState==='playing'){
+    shootTimerMs += deltaTime;
+    homingMissileTimerMs += deltaTime;
+    let currentShootDelay = upgrades.plasmaBlaster ? baseShootDelayMs*1.5 : baseShootDelayMs;
+    if (shootTimerMs>=currentShootDelay){ shoot(); shootTimerMs=0; }
+    if (homingMissileTimerMs>=homingMissileDelayMs){ shootHomingMissiles(); homingMissileTimerMs=0; }
+  } else { shootTimerMs=0; homingMissileTimerMs=0; }
+
+  if (torpedoTimerMs>0) torpedoTimerMs = Math.max(0, torpedoTimerMs - deltaTime);
+
+  const damp = Math.pow(0.92, dt*60);
+  player.vx *= damp; player.vy *= damp;
+
+  if (player.vx>0) distanceTraveled += player.vx * dt;
+
+  player.x += player.vx * dt;
+  player.y += player.vy * dt;
+
+  cameraX = player.x - canvas.width/2;
+
+  if (cameraX + canvas.width*2 > terrainGeneratedUpTo){
+    generateTerrainSegment(terrainGeneratedUpTo, terrainGeneratedUpTo + canvas.width);
+  }
+  if (player.y<0) player.y=0;
+  if (player.y>canvas.height-player.height) player.y=canvas.height-player.height;
+}
+
+function updateBullets(dt, deltaTime){
+  for (let i=bullets.length-1;i>=0;i--){
+    let b = bullets[i];
+
+    // Lifetimes for enemy homing (to prevent eternal orbit)
+    if (b.type==='enemyHoming'){
+      b.lifeMs = (b.lifeMs||0) + deltaTime;
+      if (!b.maxLifeMs) b.maxLifeMs = 4000 + Math.random()*3000; // 4-7s
+      if (b.lifeMs >= b.maxLifeMs){
+        bullets.splice(i,1); continue;
+      }
+    }
+
+    // Homing adjust
+    if (b.type==='homing' && b.target && enemies.includes(b.target)){
+      let t=b.target; let dx=t.x+t.width/2-b.x; let dy=t.y+t.height/2-b.y;
+      let dist=Math.hypot(dx,dy)||1; const speed=5, k=0.1;
+      let tvx=(dx/dist)*speed, tvy=(dy/dist)*speed;
+      b.vx += (tvx-b.vx)*k; b.vy += (tvy-b.vy)*k;
+      let s=Math.hypot(b.vx,b.vy)||1; b.vx=(b.vx/s)*speed; b.vy=(b.vy/s)*speed;
+    }
+    if (b.type==='enemyHoming' && b.target){
+      let t=b.target; let dx=t.x+t.width/2-b.x; let dy=t.y+t.height/2-b.y;
+      let dist=Math.hypot(dx,dy)||1; const speed=4.5, k=0.08;
+      let tvx=(dx/dist)*speed, tvy=(dy/dist)*speed;
+      b.vx += (tvx-b.vx)*k; b.vy += (tvy-b.vy)*k;
+      let s=Math.hypot(b.vx,b.vy)||1; b.vx=(b.vx/s)*speed; b.vy=(b.vy/s)*speed;
+    }
+
+    b.x += b.vx * dt;
+    b.y += b.vy * dt;
+
+    // Offscreen cull
+    if (b.x > cameraX+canvas.width+100 || b.x < cameraX-100 || b.y > canvas.height+50 || b.y < -50){
+      bullets.splice(i,1); continue;
+    }
+
+    if (b.type==='bomb'){
+      if (b.y > getTerrainHeight(b.x)-10){
+        createExplosion(b.x,b.y,60); playBombExplosionSound();
+        enemies.forEach(e=>{
+          let d=Math.hypot(e.x+e.width/2-b.x, e.y+e.height/2-b.y);
+          if (d<80) e.health -= b.damage || 3;
         });
-        
-        document.addEventListener('keyup', (e) => {
-            keys[e.key] = false;
-        });
-        
-        // Infinite world - no fixed width limit
-        let terrainGeneratedUpTo = 0;
+        bullets.splice(i,1); continue;
+      }
+    }
 
-        function initTerrain() {
-            terrain = [];
-            // Generate initial terrain for 3 screen widths
-            generateTerrainSegment(0, canvas.width * 3);
+    if (b.type==='torpedo'){
+      // add a faint electric wobble
+      b.y += Math.sin((b.x+b.y)*0.05)*0.4;
+    }
+  }
+}
+
+function updateEnemies(dt, deltaTime){
+  for (let i=enemies.length-1;i>=0;i--){
+    let e = enemies[i];
+    e.x += e.vx * dt; e.y += e.vy * dt;
+
+    if (e.type==='boss'){
+      e.moveTimer += deltaTime;
+      e.vy = Math.sin(e.moveTimer*0.05*0.06) * 120 * dt;
+    }
+
+    if (e.type==='dinosaur'){
+      e.walkTimer += deltaTime*0.06;
+      let th = getTerrainHeight(e.x+e.width/2);
+      let targetY = th - e.height;
+      let dy = targetY - e.y;
+      e.vy = dy * 0.6 * dt; e.y += Math.sin(e.walkTimer*0.3)*0.5;
+      if (Math.random()<0.005*dt*60) e.vx = -e.vx;
+      if (e.y<targetY-10) e.y=targetY-10;
+      if (e.y>targetY+10) e.y=targetY+10;
+    }
+
+    // NEW: Sandworm perimeter patrol
+    if (e.type==='sandworm'){
+      e.tParam += e.speedPerSec * (deltaTime/1000); if (e.tParam>1) e.tParam-=1;
+      // perimeter path (clockwise) – param t in [0,1)
+      const m = 30; // margin from edges
+      const left = cameraX + m, right = cameraX + canvas.width - m;
+      const top = m, bottom = canvas.height - m;
+      const t = e.tParam;
+      let px, py;
+      if (t < 0.25){ // top row
+        const u = t/0.25; px = left + (right-left)*u; py = top;
+      } else if (t < 0.5){ // right col
+        const u = (t-0.25)/0.25; px = right; py = top + (bottom-top)*u;
+      } else if (t < 0.75){ // bottom row
+        const u = (t-0.5)/0.25; px = right - (right-left)*u; py = bottom;
+      } else { // left col
+        const u = (t-0.75)/0.25; px = left; py = bottom - (bottom-top)*u;
+      }
+      e.x = px - e.width/2;
+      e.y = py - e.height/2;
+
+      // fire at intervals
+      e.shootTimerMs += deltaTime;
+      const sd = 900 - Math.min(gameTime/6000, 500); // gets a bit faster over time
+      if (e.shootTimerMs > sd){
+        e.shootTimerMs = 0;
+        // bursts of missiles aimed at player
+        const headX = e.x + e.width/2, headY = e.y + e.height/2;
+        for (let k=0;k<2;k++){
+          let dx = (player.x+player.width/2) - headX;
+          let dy = (player.y+player.height/2) - headY;
+          let d = Math.hypot(dx,dy)||1;
+          const sp = 4.8 + Math.random()*0.8;
+          bullets.push({
+            x: headX, y: headY,
+            vx: (dx/d)*sp, vy: (dy/d)*sp,
+            type: 'enemyHoming',
+            width: 6, height: 6,
+            target: player,
+            damage: Math.round(10 * e.weaponScale)
+          });
         }
+      }
+    }
 
-        function generateTerrainSegment(startX, endX) {
-            for (let x = startX; x < endX; x += 10) {
-                let height = 450 + Math.sin(x * 0.02) * 20 + Math.sin(x * 0.005) * 40;
-                if (Math.random() < 0.1) {
-                    let craterWidth = 40 + Math.random() * 60;
-                    let craterDepth = 20 + Math.random() * 30;
-                    for (let i = 0; i < craterWidth; i += 10) {
-                        if (x + i < endX) {
-                            let craterHeight = height + Math.sin((i / craterWidth) * Math.PI) * craterDepth;
-                            terrain.push({ x: x + i, y: craterHeight });
-                        }
-                    }
-                    x += craterWidth;
-                } else {
-                    terrain.push({ x: x, y: height });
-                }
-            }
-            terrainGeneratedUpTo = endX;
-        }
+    // Enemy shooting cadence
+    e.shootTimerMs = (e.shootTimerMs||0) + deltaTime;
+    let sd;
+    if (gameTime<30000) sd=5000+Math.random()*3300;
+    else if (gameTime<60000) sd=4000+Math.random()*2000;
+    else if (gameTime<120000) sd=3000+Math.random()*1500;
+    else sd=2000+Math.random()*1000;
 
+    if (e.shootTimerMs > sd && e.type!=='sandworm'){ // worm handles its own fire
+      if (e.type==='dinosaur'){
+        let dx=player.x+player.width/2-e.x, dy=player.y+player.height/2-e.y;
+        let d=Math.hypot(dx,dy)||1; let sp=4.5;
+        bullets.push({ x:e.x, y:e.y+e.height/2, vx:(dx/d)*sp, vy:(dy/d)*sp,
+          type:'enemyHoming', width:5, height:5, target:player, damage:10 });
+      } else {
+        // Fighter/Bomber fire; fighters scale with tier weaponScale
+        const baseSpeed = (e.type==='fighter') ? 3.2*e.weaponScale : 3.2;
+        const dmg = (e.type==='fighter') ? Math.round(10 * e.weaponScale) : 10;
+        bullets.push({ x:e.x, y:e.y+e.height/2, vx:-baseSpeed, vy:0, type:'enemy', width:6, height:6, damage:dmg });
+      }
+      e.shootTimerMs = 0;
+    }
 
-        
-        function initStars() {
-            stars = [];
-            for (let i = 0; i < 100; i++) {
-                stars.push({
-                    x: Math.random() * canvas.width,
-                    y: Math.random() * canvas.height * 0.8,
-                    brightness: Math.random()
-                });
-            }
-        }
-        
-        function startGame() {
-            playerName = document.getElementById('playerName').value || 'Anonymous';
-            document.getElementById('startScreen').style.display = 'none';
-            gameState = 'playing';
-            resetGameVars();
-            initTerrain();
-            initStars();
-            gameLoop(0);
-        }
-        
-        function resetGameVars() {
-            gameTime = 0;
-            score = 0;
-            lives = 3;
-            bombs = 3;
-            shield = 100;
-            lastBossTime = 0;
-            shootTimer = 0;
-            player.x = 100;
-            player.y = 300;
-            player.vx = 0;
-            player.vy = 0;
-            bullets = [];
-            enemies = [];
-            explosions = [];
-            powerUps = [];
-        }
-        
-        function resetGame() {
-            document.getElementById('gameOverScreen').style.display = 'none';
-            document.getElementById('startScreen').style.display = 'block';
-            gameState = 'start';
-        }
-        
-        function shoot() {
-            // Primary weapon - Plasma Blaster if owned, otherwise regular laser
-            if (upgrades.plasmaBlaster) {
-                bullets.push({
-                    x: player.x + player.width,
-                    y: player.y + player.height / 2,
-                    vx: 6, // Slower speed
-                    vy: 0,
-                    type: 'plasma',
-                    width: 20, // Larger
-                    height: 6,
-                    damage: 2 // Higher damage
-                });
-            } else {
-                bullets.push({
-                    x: player.x + player.width,
-                    y: player.y + player.height / 2,
-                    vx: 8,
-                    vy: 0,
-                    type: 'laser',
-                    width: 12,
-                    height: 3,
-                    damage: 1
-                });
-            }
+    // Cull and death
+    if (e.x < cameraX-100 || e.health<=0){
+      if (e.health<=0){
+        createExplosion(e.x+e.width/2, e.y+e.height/2, e.type==='boss'||e.type==='sandworm'? 90:40);
+        playExplosionSound();
+        let enemyCredits =
+          e.type==='sandworm' ? 120 :
+          e.type==='boss' ? 50 :
+          e.type==='dinosaur' ? 10 :
+          e.type==='bomber' ? 5 : 1;
+        credits += enemyCredits;
+        score += e.type==='sandworm' ? 1200 :
+                 e.type==='boss' ? 500 :
+                 e.type==='dinosaur' ? 150 : 100;
+        if (Math.random() < (e.type==='boss'||e.type==='sandworm' ? 1 : 0.3)) spawnPowerUp(e.x, e.y, (e.type==='boss'||e.type==='sandworm'));
+      }
+      enemies.splice(i,1);
+    }
+  }
+}
 
-            // Secondary weapons - Missiles
-            if (upgrades.missiles >= 1) {
-                // Tier 1 missile (below)
-                bullets.push({
-                    x: player.x + player.width,
-                    y: player.y + player.height / 2 + 8,
-                    vx: 4,
-                    vy: 0,
-                    type: 'missile',
-                    width: 8,
-                    height: 4,
-                    damage: 3,
-                    tier: 1
-                });
-            }
+function updatePowerUps(dt, deltaTime){
+  for (let i=powerUps.length-1;i>=0;i--){
+    let p=powerUps[i]; p.hoverTimerMs+=deltaTime;
+    if (p.hoverTimerMs >= p.hoverDurationMs) p.vy = 120*dt;
+    let dx=(player.x+player.width/2)-(p.x+p.width/2);
+    let dy=(player.y+player.height/2)-(p.y+p.height/2);
+    let dist=Math.hypot(dx,dy)||1;
+    if (dist<150){
+      let strength=Math.max(0.3,2 - dist/75);
+      let ang=Math.atan2(dy,dx);
+      p.vx += Math.cos(ang)*strength*6*dt;
+      p.vy += Math.sin(ang)*strength*6*dt;
+      p.vx *= Math.pow(0.9, dt*60); p.vy *= Math.pow(0.9, dt*60);
+    } else {
+      p.vx *= Math.pow(0.95, dt*60); p.vy *= Math.pow(0.95, dt*60);
+    }
+    p.x += p.vx*dt; p.y += p.vy*dt; p.timerMs=(p.timerMs||0)+deltaTime;
+    if (p.y>canvas.height || p.timerMs>10000){ powerUps.splice(i,1); continue; }
+    if (checkCollision(player,p)){
+      if (p.type==='bombs'){ const maxB = upgrades.bombCapacity?50:9; bombs = Math.min(bombs+3, maxB); }
+      if (p.type==='shield'){ shield = Math.min(shield+25, 100); }
+      if (p.type==='life'){ lives++; }
+      score += 50; playPowerUpSound(); powerUps.splice(i,1);
+    }
+  }
+}
 
-            if (upgrades.missiles >= 2) {
-                // Tier 2 missile (above)
-                bullets.push({
-                    x: player.x + player.width,
-                    y: player.y + player.height / 2 - 8,
-                    vx: 4,
-                    vy: 0,
-                    type: 'missile',
-                    width: 8,
-                    height: 4,
-                    damage: 3,
-                    tier: 2
-                });
-            }
+function updateExplosions(deltaTime){
+  for (let i=explosions.length-1;i>=0;i--){
+    let ex=explosions[i]; ex.timerMs += deltaTime;
+    if (ex.timerMs >= ex.maxTimerMs) explosions.splice(i,1);
+  }
+}
 
-            playLaserSound();
-        }
+/* ================== Collisions ================== */
+function checkCollision(a,b){
+  return a.x < b.x + b.width && a.x + a.width > b.x &&
+         a.y < b.y + b.height && a.y + a.height > b.y;
+}
 
-        function shootHomingMissiles() {
-            // Homing Missiles - fired at slower rate
-            if (upgrades.homingMissiles >= 1) {
-                // Tier 1: Target strongest enemy
-                let targetEnemy = null;
-                let maxHealth = 0;
-                enemies.forEach(enemy => {
-                    if (enemy.health > maxHealth) {
-                        maxHealth = enemy.health;
-                        targetEnemy = enemy;
-                    }
-                });
+function checkCollisions(){
+  // Player bullets vs enemies
+  for (let i=bullets.length-1;i>=0;i--){
+    const b=bullets[i];
+    if (b.type==='enemy' || b.type==='enemyHoming') continue;
 
-                if (targetEnemy) {
-                    console.log('Firing homing missile at enemy with health:', maxHealth);
-                    let dx = targetEnemy.x + targetEnemy.width/2 - (player.x + player.width);
-                    let dy = targetEnemy.y + targetEnemy.height/2 - (player.y + player.height/2);
-                    let distance = Math.sqrt(dx * dx + dy * dy);
-                    let speed = 3;
-
-                    bullets.push({
-                        x: player.x + player.width,
-                        y: player.y + player.height / 2 - 8,
-                        vx: (dx / distance) * speed,
-                        vy: (dy / distance) * speed,
-                        type: 'homing',
-                        width: 6,
-                        height: 6,
-                        damage: 2,
-                        target: targetEnemy,
-                        tier: 1
-                    });
-                }
-            }
-
-            if (upgrades.homingMissiles >= 2) {
-                // Tier 2: Target nearest enemy with full health (not yet fired upon)
-                let targetEnemy = null;
-                let minDistance = Infinity;
-
-                enemies.forEach(enemy => {
-                    if (enemy.health === enemy.maxHealth || enemy.health > 5) { // Target healthy enemies
-                        let dx = enemy.x + enemy.width/2 - (player.x + player.width);
-                        let dy = enemy.y + enemy.height/2 - (player.y + player.height/2);
-                        let distance = Math.sqrt(dx * dx + dy * dy);
-
-                        if (distance < minDistance) {
-                            minDistance = distance;
-                            targetEnemy = enemy;
-                        }
-                    }
-                });
-
-                if (targetEnemy) {
-                    let dx = targetEnemy.x + targetEnemy.width/2 - (player.x + player.width);
-                    let dy = targetEnemy.y + targetEnemy.height/2 - (player.y + player.height/2);
-                    let distance = Math.sqrt(dx * dx + dy * dy);
-                    let speed = 3;
-
-                    bullets.push({
-                        x: player.x + player.width,
-                        y: player.y + player.height / 2 + 8, // Below tier 1
-                        vx: (dx / distance) * speed,
-                        vy: (dy / distance) * speed,
-                        type: 'homing',
-                        width: 6,
-                        height: 6,
-                        damage: 2,
-                        target: targetEnemy,
-                        tier: 2
-                    });
-                }
-            }
-        }
-        
-        function dropBomb() {
-            if (bombs > 0) {
-                bombs--;
-                bullets.push({
-                    x: player.x,
-                    y: player.y + player.height,
-                    vx: 0,
-                    vy: 3,
-                    type: 'bomb',
-                    width: 8,
-                    height: 8
-                });
-            }
-        }
-        
-        function getTerrainHeight(x) {
-            for (let i = 0; i < terrain.length - 1; i++) {
-                if (x >= terrain[i].x && x <= terrain[i + 1].x) {
-                    return terrain[i].y;
-                }
-            }
-            return 450;
-        }
-        
-        function spawnEnemy() {
-            let enemyTypes = ['fighter', 'bomber', 'dinosaur'];
-            // Start with extremely low spawn rate, increase very gradually
-            let baseSpawnChance = Math.min(0.0005 + gameTime * 0.00001, 0.02); // Even lower starting rate
-            // Add progressive difficulty: increase spawn rate over time
-            let difficultyMultiplier = 1 + Math.floor(gameTime / 120000) * 0.15; // Much slower increase
-            let spawnChance = Math.min(baseSpawnChance * difficultyMultiplier, 0.04); // Much lower max rate
-
-            // Limit dinosaurs on screen - very restrictive at start
-            let currentDinosaurs = enemies.filter(e => e.type === 'dinosaur').length;
-            let maxDinosaurs = gameTime < 15000 ? 0 : // First 15 seconds: NO dinosaurs
-                              gameTime < 45000 ? 1 : // Next 30 seconds: max 1 dinosaur
-                              gameTime < 90000 ? 2 : // Next 45 seconds: max 2 dinosaurs
-                              3; // After that: max 3 dinosaurs
-
-            if (Math.random() < spawnChance) {
-                let type = enemyTypes[Math.floor(Math.random() * enemyTypes.length)];
-
-                // Don't spawn dinosaur if we've reached the limit
-                if (type === 'dinosaur' && currentDinosaurs >= maxDinosaurs) {
-                    type = enemyTypes[Math.floor(Math.random() * 2)]; // Pick fighter or bomber instead
-                }
-
-                let spawnX = cameraX + canvas.width + 50;
-                let enemyHealth = type === 'dinosaur' ? 8 + Math.floor(gameTime / 45000) : 1 + Math.floor(gameTime / 60000);
-                let enemy = {
-                    type: type,
-                    x: spawnX,
-                    y: type === 'dinosaur' ? getTerrainHeight(spawnX) - 35 : Math.random() * (canvas.height - 200),
-                    width: type === 'dinosaur' ? 45 : type === 'boss' ? 80 : 25,
-                    height: type === 'dinosaur' ? 35 : type === 'boss' ? 60 : 20,
-                    vx: -1.5 - Math.random() * 1 - Math.floor(gameTime / 60000) * 0.15, // Much slower speed increase over time
-                    vy: 0,
-                    health: enemyHealth,
-                    maxHealth: enemyHealth, // Store initial health for tier 2 homing missiles
-                    shootTimer: 0,
-                    walkTimer: type === 'dinosaur' ? Math.random() * 100 : 0 // For walking animation
-                };
-                enemies.push(enemy);
-            }
-
-            // Boss spawn interval decreases over time
-            let bossInterval = Math.max(20000 - Math.floor(gameTime / 60000) * 3000, 10000);
-            if (gameTime - lastBossTime > bossInterval) {
-                let spawnX = cameraX + canvas.width + 100;
-                let bossHealth = 10 + Math.floor(gameTime / 45000) * 5;
-                enemies.push({
-                    type: 'boss',
-                    x: spawnX,
-                    y: canvas.height / 2 - 40,
-                    width: 80,
-                    height: 60,
-                    vx: -1 - Math.floor(gameTime / 120000) * 0.15, // Much slower boss speed increase
-                    vy: 0,
-                    health: bossHealth,
-                    maxHealth: bossHealth, // Store initial health for tier 2 homing missiles
-                    shootTimer: 0,
-                    moveTimer: 0
-                });
-                lastBossTime = gameTime;
-            }
-        }
-        
-        function updatePlayer() {
-            if (keys['ArrowLeft']) player.vx = Math.max(player.vx - 0.6, -player.maxSpeed);
-            if (keys['ArrowRight']) player.vx = Math.min(player.vx + 0.6, player.maxSpeed);
-            if (keys['ArrowUp']) player.vy = Math.max(player.vy - 0.6, -player.maxSpeed);
-            if (keys['ArrowDown']) player.vy = Math.min(player.vy + 0.6, player.maxSpeed);
-
-            if (keys[' '] && gameState === 'playing') {
-                shootTimer++;
-                homingMissileTimer++;
-
-                // Regular weapons (laser/plasma/missiles) - normal fire rate
-                let currentShootDelay = upgrades.plasmaBlaster ? shootDelay * 1.5 : shootDelay;
-                if (shootTimer >= currentShootDelay) {
-                    shoot();
-                    shootTimer = 0;
-                }
-
-                // Homing missiles - slower fire rate
-                if (homingMissileTimer >= homingMissileDelay) {
-                    shootHomingMissiles();
-                    homingMissileTimer = 0;
-                }
-            } else {
-                shootTimer = 0;
-                homingMissileTimer = 0;
-            }
-
-            player.vx *= 0.92;
-            player.vy *= 0.92;
-
-            // Track distance traveled (only horizontal movement counts)
-            if (player.vx > 0) {
-                distanceTraveled += player.vx;
-            }
-
-            player.x += player.vx;
-            player.y += player.vy;
-
-            // Update camera to follow player - infinite world, no bounds
-            cameraX = player.x - canvas.width / 2;
-
-            // Generate more terrain if needed (keep 2 screens ahead)
-            if (cameraX + canvas.width * 2 > terrainGeneratedUpTo) {
-                generateTerrainSegment(terrainGeneratedUpTo, terrainGeneratedUpTo + canvas.width);
-            }
-
-            // Keep player within reasonable bounds vertically
-            if (player.y < 0) player.y = 0;
-            if (player.y > canvas.height - player.height) player.y = canvas.height - player.height;
-        }
-        
-        function updateBullets() {
-            for (let i = bullets.length - 1; i >= 0; i--) {
-                let bullet = bullets[i];
-
-                // Homing missile targeting logic
-                if (bullet.type === 'homing' && bullet.target && enemies.includes(bullet.target)) {
-                    let target = bullet.target;
-                    let dx = target.x + target.width/2 - bullet.x;
-                    let dy = target.y + target.height/2 - bullet.y;
-                    let distance = Math.sqrt(dx * dx + dy * dy);
-
-                    if (distance > 0) {
-                        // Adjust velocity towards target (smooth homing)
-                        let homingSpeed = 3;
-                        let homingStrength = 0.1; // How aggressively it turns
-
-                        let targetVx = (dx / distance) * homingSpeed;
-                        let targetVy = (dy / distance) * homingSpeed;
-
-                        bullet.vx += (targetVx - bullet.vx) * homingStrength;
-                        bullet.vy += (targetVy - bullet.vy) * homingStrength;
-
-                        // Normalize speed to maintain consistent velocity
-                        let currentSpeed = Math.sqrt(bullet.vx * bullet.vx + bullet.vy * bullet.vy);
-                        if (currentSpeed > 0) {
-                            bullet.vx = (bullet.vx / currentSpeed) * homingSpeed;
-                            bullet.vy = (bullet.vy / currentSpeed) * homingSpeed;
-                        }
-                    }
-                }
-
-                // Enemy homing missile targeting logic
-                if (bullet.type === 'enemyHoming' && bullet.target) {
-                    let target = bullet.target;
-                    let dx = target.x + target.width/2 - bullet.x;
-                    let dy = target.y + target.height/2 - bullet.y;
-                    let distance = Math.sqrt(dx * dx + dy * dy);
-
-                    if (distance > 0) {
-                        // Adjust velocity towards target (smooth homing)
-                        let homingSpeed = 2.5;
-                        let homingStrength = 0.08; // Slightly less aggressive than player missiles
-
-                        let targetVx = (dx / distance) * homingSpeed;
-                        let targetVy = (dy / distance) * homingSpeed;
-
-                        bullet.vx += (targetVx - bullet.vx) * homingStrength;
-                        bullet.vy += (targetVy - bullet.vy) * homingStrength;
-
-                        // Normalize speed to maintain consistent velocity
-                        let currentSpeed = Math.sqrt(bullet.vx * bullet.vx + bullet.vy * bullet.vy);
-                        if (currentSpeed > 0) {
-                            bullet.vx = (bullet.vx / currentSpeed) * homingSpeed;
-                            bullet.vy = (bullet.vy / currentSpeed) * homingSpeed;
-                        }
-                    }
-                }
-
-                bullet.x += bullet.vx;
-                bullet.y += bullet.vy;
-
-                // Remove bullets that are far off screen (accounting for world coordinates)
-                if (bullet.x > cameraX + canvas.width + 100 || bullet.x < cameraX - 100 || bullet.y > canvas.height + 50) {
-                    bullets.splice(i, 1);
-                    continue;
-                }
-
-                if (bullet.type === 'bomb' && bullet.y > getTerrainHeight(bullet.x) - 10) {
-                    createExplosion(bullet.x, bullet.y, 60);
-                    playBombExplosionSound();
-                    enemies.forEach(enemy => {
-                        let dist = Math.sqrt((enemy.x + enemy.width/2 - bullet.x) ** 2 + (enemy.y + enemy.height/2 - bullet.y) ** 2);
-                        if (dist < 80) {
-                            enemy.health -= 3;
-                        }
-                    });
-                    bullets.splice(i, 1);
-                }
-            }
-        }
-        
-        function updateEnemies() {
-            for (let i = enemies.length - 1; i >= 0; i--) {
-                let enemy = enemies[i];
-                enemy.x += enemy.vx;
-                enemy.y += enemy.vy;
-
-                if (enemy.type === 'boss') {
-                    enemy.moveTimer++;
-                    enemy.vy = Math.sin(enemy.moveTimer * 0.05) * 2;
-                }
-
-                if (enemy.type === 'dinosaur') {
-                    // Ground enemy behavior - follow terrain
-                    enemy.walkTimer++;
-                    let terrainHeight = getTerrainHeight(enemy.x + enemy.width/2);
-                    let targetY = terrainHeight - enemy.height;
-
-                    // Smoothly move towards terrain height
-                    let dy = targetY - enemy.y;
-                    enemy.vy = dy * 0.1; // Smooth terrain following
-
-                    // Add slight bobbing for walking animation
-                    enemy.y += Math.sin(enemy.walkTimer * 0.3) * 0.5;
-
-                    // Randomly change direction occasionally
-                    if (Math.random() < 0.005) {
-                        enemy.vx = -enemy.vx;
-                    }
-
-                    // Don't let dinosaurs go too high or too low
-                    if (enemy.y < targetY - 10) enemy.y = targetY - 10;
-                    if (enemy.y > targetY + 10) enemy.y = targetY + 10;
-                }
-
-                enemy.shootTimer++;
-                // Enemies shoot dramatically less frequently for beginner-friendly experience
-                let shootDelay = gameTime < 30000 ? 300 + Math.random() * 200 : // First 30 seconds: very slow shooting (5-8.3 seconds)
-                                gameTime < 60000 ? 240 + Math.random() * 120 :   // Next 30 seconds: slow shooting (4-6 seconds)
-                                gameTime < 120000 ? 180 + Math.random() * 90 :   // Next 60 seconds: moderate shooting (3-4.5 seconds)
-                                120 + Math.random() * 60;                        // After that: normal shooting (2-3 seconds)
-
-                if (enemy.shootTimer > shootDelay) {
-                    if (enemy.type === 'dinosaur') {
-                        // Dinosaurs shoot heat-seeking missiles
-                        let dx = player.x + player.width/2 - enemy.x;
-                        let dy = player.y + player.height/2 - enemy.y;
-                        let distance = Math.sqrt(dx * dx + dy * dy);
-                        if (distance > 0) {
-                            let speed = 2.5;
-                            bullets.push({
-                                x: enemy.x,
-                                y: enemy.y + enemy.height / 2,
-                                vx: (dx / distance) * speed,
-                                vy: (dy / distance) * speed,
-                                type: 'enemyHoming',
-                                width: 5,
-                                height: 5,
-                                target: player
-                            });
-                        }
-                    } else {
-                        bullets.push({
-                            x: enemy.x,
-                            y: enemy.y + enemy.height / 2,
-                            vx: -2, // Slower enemy bullets
-                            vy: 0,
-                            type: 'enemy',
-                            width: 6,
-                            height: 6
-                        });
-                    }
-                    enemy.shootTimer = 0;
-                }
-
-                if (enemy.x < -100 || enemy.health <= 0) {
-                    if (enemy.health <= 0) {
-                        createExplosion(enemy.x + enemy.width/2, enemy.y + enemy.height/2, enemy.type === 'boss' ? 80 : 40);
-                        playExplosionSound();
-
-                        // Award credits based on enemy type
-                        let enemyCredits = enemy.type === 'boss' ? 50 :
-                                         enemy.type === 'dinosaur' ? 10 :
-                                         enemy.type === 'bomber' ? 5 : 1;
-                        credits += enemyCredits;
-
-                        score += enemy.type === 'boss' ? 500 : enemy.type === 'dinosaur' ? 150 : 100;
-
-                        if (Math.random() < (enemy.type === 'boss' ? 1 : 0.3)) {
-                            spawnPowerUp(enemy.x, enemy.y, enemy.type === 'boss');
-                        }
-                    }
-                    enemies.splice(i, 1);
-                }
-            }
-        }
-        
-        function spawnPowerUp(x, y, isBoss) {
-            let types = ['bombs', 'shield'];
-            if (isBoss) types.push('life');
-
-            let type = types[Math.floor(Math.random() * types.length)];
-
-            powerUps.push({
-                x: x,
-                y: y,
-                vx: 0, // Initialize horizontal velocity
-                vy: 0, // Start with no vertical velocity (hovering)
-                type: type,
-                timer: 0,
-                hoverTimer: 0,
-                hoverDuration: 480 + Math.random() * 240, // 8-12 seconds at 60fps (480-720 frames) - much longer hover time
-                width: 16,
-                height: 16
+    for (let j=enemies.length-1;j>=0;j--){
+      let e=enemies[j];
+      if (checkCollision(b,e)){
+        e.health -= b.damage || 1;
+        // torpedo pierce/aoe
+        if (b.type==='torpedo'){
+          if (b.pierce>0){ b.pierce--; } else {
+            createExplosion(b.x,b.y,70);
+            // small AoE splash
+            enemies.forEach(en=>{
+              const d=Math.hypot(en.x+en.width/2-b.x, en.y+en.height/2-b.y);
+              if (d<85) en.health -= 6;
             });
+            bullets.splice(i,1);
+          }
+        } else if (b.type==='laser' || b.type==='plasma'){
+          bullets.splice(i,1);
         }
-        
-        function updatePowerUps() {
-            for (let i = powerUps.length - 1; i >= 0; i--) {
-                let powerUp = powerUps[i];
-                powerUp.hoverTimer++;
-
-                // After hover duration, start falling
-                if (powerUp.hoverTimer >= powerUp.hoverDuration) {
-                    powerUp.vy = 2; // Start falling
-                }
-
-                // Magnetic attraction to player
-                let dx = (player.x + player.width/2) - (powerUp.x + powerUp.width/2);
-                let dy = (player.y + player.height/2) - (powerUp.y + powerUp.height/2);
-                let distance = Math.sqrt(dx * dx + dy * dy);
-
-                // If within magnetic range (150 pixels), attract towards player
-                if (distance < 150) {
-                    let attractionStrength = Math.max(0.3, 2 - distance / 75); // Weaker attraction, longer range
-                    let angle = Math.atan2(dy, dx);
-
-                    // Apply magnetic force more gently
-                    powerUp.vx += Math.cos(angle) * attractionStrength * 0.1;
-                    powerUp.vy += Math.sin(angle) * attractionStrength * 0.1;
-
-                    // Stronger damping to prevent overshooting
-                    powerUp.vx *= 0.9;
-                    powerUp.vy *= 0.9;
-                } else {
-                    // Reset velocity when out of range
-                    powerUp.vx *= 0.95;
-                    powerUp.vy *= 0.95;
-                }
-
-                powerUp.x += powerUp.vx;
-                powerUp.y += powerUp.vy;
-                powerUp.timer++;
-
-                if (powerUp.y > canvas.height || powerUp.timer > 600) { // Extended lifetime for falling
-                    powerUps.splice(i, 1);
-                    continue;
-                }
-
-                if (checkCollision(player, powerUp)) {
-                    switch (powerUp.type) {
-                        case 'bombs':
-                            const maxBombs = upgrades.bombCapacity ? 50 : 9;
-                            bombs = Math.min(bombs + 3, maxBombs);
-                            break;
-                        case 'shield':
-                            shield = Math.min(shield + 25, 100);
-                            break;
-                        case 'life':
-                            lives++;
-                            break;
-                    }
-                    score += 50;
-                    playPowerUpSound();
-                    powerUps.splice(i, 1);
-                }
-            }
-        }
-        
-        function checkCollision(a, b) {
-            return a.x < b.x + b.width &&
-                   a.x + a.width > b.x &&
-                   a.y < b.y + b.height &&
-                   a.y + a.height > b.y;
-        }
-        
-        function checkCollisions() {
-            // Bullet vs enemy collisions
-            for (let i = bullets.length - 1; i >= 0; i--) {
-                let bullet = bullets[i];
-                if (bullet.type === 'enemy') continue;
-
-                for (let j = enemies.length - 1; j >= 0; j--) {
-                    let enemy = enemies[j];
-                    if (checkCollision(bullet, enemy)) {
-                        enemy.health -= bullet.damage || 1; // Use bullet damage or default to 1
-                        if (bullet.type === 'laser' || bullet.type === 'plasma') {
-                            bullets.splice(i, 1);
-                        }
-                        createExplosion(bullet.x, bullet.y, 25);
-                        break;
-                    }
-                }
-            }
-            
-            // Enemy bullet vs player
-            for (let i = bullets.length - 1; i >= 0; i--) {
-                let bullet = bullets[i];
-                if (bullet.type !== 'enemy') continue;
-                
-                if (checkCollision(bullet, player)) {
-                    shield -= 10;
-                    bullets.splice(i, 1);
-                    createExplosion(player.x + player.width/2, player.y + player.height/2, 30);
-                }
-            }
-            
-            enemies.forEach(enemy => {
-                if (checkCollision(enemy, player)) {
-                    shield -= 20;
-                    createExplosion(player.x + player.width/2, player.y + player.height/2, 40);
-                    enemy.health = 0;
-                }
-            });
-            
-            if (shield <= 0) {
-                lives--;
-                shield = 100;
-                if (lives <= 0) {
-                    gameOver();
-                }
-            }
-        }
-        
-        function createExplosion(x, y, size) {
-            explosions.push({
-                x: x,
-                y: y,
-                size: size,
-                timer: 0,
-                maxTimer: 20
-            });
-        }
-        
-        function updateExplosions() {
-            for (let i = explosions.length - 1; i >= 0; i--) {
-                let explosion = explosions[i];
-                explosion.timer++;
-                if (explosion.timer >= explosion.maxTimer) {
-                    explosions.splice(i, 1);
-                }
-            }
-        }
-        
-        function gameOver() {
-            gameState = 'gameOver';
-            let parsecs = Math.floor(distanceTraveled / 100);
-            let finalScore = score + Math.floor(gameTime / 1000) * 10 + parsecs * 5; // Distance bonus: 5 points per parsec
-
-            // Check if it's a high score
-            if (isHighScore(finalScore)) {
-                addHighScore(playerName, finalScore);
-                document.getElementById('finalScore').textContent = `NEW HIGH SCORE: ${finalScore}`;
-            } else {
-                document.getElementById('finalScore').textContent = `Final Score: ${finalScore}`;
-            }
-
-            document.getElementById('playerNameDisplay').textContent = `Player: ${playerName} - ${parsecs} Parsecs Traveled`;
-            document.getElementById('gameOverScreen').style.display = 'block';
-        }
-        
-        function draw() {
-            // Clear with solid background
-            ctx.fillStyle = '#282a36';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            ctx.save();
-            ctx.translate(-cameraX, 0);
-
-            // Draw stars
-            ctx.fillStyle = '#8be9fd';
-            stars.forEach(star => {
-                ctx.globalAlpha = star.brightness * 0.7;
-                ctx.fillRect(star.x + cameraX, star.y, 1, 1);
-            });
-            ctx.globalAlpha = 1;
-
-            // Draw terrain
-            ctx.strokeStyle = '#ffb86c';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            terrain.forEach((point, i) => {
-                if (i === 0) ctx.moveTo(point.x, point.y);
-                else ctx.lineTo(point.x, point.y);
-            });
-            ctx.stroke();
-
-            ctx.fillStyle = '#bd93f9';
-            ctx.beginPath();
-            terrain.forEach((point, i) => {
-                if (i === 0) ctx.moveTo(point.x, point.y);
-                else ctx.lineTo(point.x, point.y);
-            });
-            ctx.lineTo(canvas.width + cameraX, canvas.height);
-            ctx.lineTo(cameraX, canvas.height);
-            ctx.closePath();
-            ctx.fill();
-            
-            // Draw player as triangle ship
-            ctx.save();
-            ctx.translate(player.x + player.width/2, player.y + player.height/2);
-            ctx.fillStyle = '#50fa7b';
-            ctx.beginPath();
-            ctx.moveTo(15, 0);
-            ctx.lineTo(-10, -8);
-            ctx.lineTo(-5, 0);
-            ctx.lineTo(-10, 8);
-            ctx.closePath();
-            ctx.fill();
-            
-            // Engine glow
-            ctx.fillStyle = '#ff5555';
-            ctx.beginPath();
-            ctx.moveTo(-5, -3);
-            ctx.lineTo(-15, 0);
-            ctx.lineTo(-5, 3);
-            ctx.closePath();
-            ctx.fill();
-            ctx.restore();
-            
-            // Draw enemies with simple Atari-style pixel monsters
-            enemies.forEach(enemy => {
-                ctx.save();
-                ctx.translate(enemy.x, enemy.y);
-
-                if (enemy.type === 'dinosaur') {
-                    // Simple pixel dinosaur - blocky and retro
-                    ctx.fillStyle = '#50fa7b';
-
-                    // Body - simple rectangle
-                    ctx.fillRect(8, 15, 16, 12);
-
-                    // Head - simple square
-                    ctx.fillRect(20, 10, 8, 8);
-
-                    // Legs - simple lines
-                    ctx.fillRect(10, 27, 2, 8);
-                    ctx.fillRect(18, 27, 2, 8);
-
-                    // Eyes - simple dots
-                    ctx.fillStyle = '#ffffff';
-                    ctx.fillRect(22, 12, 1, 1);
-                    ctx.fillRect(25, 12, 1, 1);
-
-                    // Spikes - simple triangles
-                    ctx.fillStyle = '#50fa7b';
-                    ctx.fillRect(8, 12, 2, 3);
-                    ctx.fillRect(12, 10, 2, 5);
-                    ctx.fillRect(16, 8, 2, 7);
-
-                } else if (enemy.type === 'fighter') {
-                    // Simple pixel fighter - like a flying saucer
-                    ctx.fillStyle = '#ff5555';
-
-                    // Main body - oval shape with pixels
-                    ctx.fillRect(6, 8, 12, 8);
-
-                    // Wings - simple rectangles
-                    ctx.fillRect(2, 10, 4, 4);
-                    ctx.fillRect(18, 10, 4, 4);
-
-                    // Cockpit - small rectangle
-                    ctx.fillStyle = '#ffb86c';
-                    ctx.fillRect(10, 6, 4, 4);
-
-                } else if (enemy.type === 'bomber') {
-                    // Simple pixel bomber - boxy plane
-                    ctx.fillStyle = '#ffb86c';
-
-                    // Fuselage
-                    ctx.fillRect(8, 12, 8, 6);
-
-                    // Wings
-                    ctx.fillRect(4, 14, 4, 2);
-                    ctx.fillRect(16, 14, 4, 2);
-
-                    // Tail
-                    ctx.fillRect(10, 8, 4, 4);
-
-                } else if (enemy.type === 'boss') {
-                    // Simple pixel boss - large blocky monster
-                    ctx.fillStyle = '#ff5555';
-
-                    // Main body
-                    ctx.fillRect(10, 15, 20, 15);
-
-                    // Eyes
-                    ctx.fillStyle = '#ffffff';
-                    ctx.fillRect(14, 18, 2, 2);
-                    ctx.fillRect(24, 18, 2, 2);
-
-                    // Mouth
-                    ctx.fillStyle = '#000000';
-                    ctx.fillRect(16, 25, 8, 2);
-
-                    // Antennas
-                    ctx.fillStyle = '#ff5555';
-                    ctx.fillRect(12, 10, 1, 5);
-                    ctx.fillRect(27, 10, 1, 5);
-                }
-
-                ctx.restore();
-            });
-            
-            // Draw bullets
-            bullets.forEach(bullet => {
-                if (bullet.type === 'laser') {
-                    ctx.strokeStyle = '#8be9fd';
-                    ctx.lineWidth = 3;
-                    ctx.beginPath();
-                    ctx.moveTo(bullet.x, bullet.y);
-                    ctx.lineTo(bullet.x + 12, bullet.y);
-                    ctx.stroke();
-
-                    ctx.strokeStyle = '#ffffff';
-                    ctx.lineWidth = 1;
-                    ctx.beginPath();
-                    ctx.moveTo(bullet.x, bullet.y);
-                    ctx.lineTo(bullet.x + 12, bullet.y);
-                    ctx.stroke();
-                } else if (bullet.type === 'plasma') {
-                    // Larger purple plasma bolt
-                    ctx.fillStyle = '#bd93f9';
-                    ctx.fillRect(bullet.x, bullet.y - 3, bullet.width, bullet.height);
-
-                    ctx.strokeStyle = '#ff79c6';
-                    ctx.lineWidth = 2;
-                    ctx.strokeRect(bullet.x, bullet.y - 3, bullet.width, bullet.height);
-                } else if (bullet.type === 'missile') {
-                    // White rocket
-                    ctx.fillStyle = '#ffffff';
-                    ctx.fillRect(bullet.x, bullet.y - 2, bullet.width, bullet.height);
-
-                    // Rocket trail
-                    ctx.fillStyle = '#ff5555';
-                    ctx.fillRect(bullet.x - 4, bullet.y - 1, 4, 2);
-                } else if (bullet.type === 'homing') {
-                    // Red homing missile with white tail
-                    ctx.fillStyle = '#ff5555';
-                    ctx.fillRect(bullet.x, bullet.y - bullet.height/2, bullet.width, bullet.height);
-
-                    // White missile tail
-                    ctx.fillStyle = '#ffffff';
-                    ctx.fillRect(bullet.x - bullet.width/2, bullet.y - bullet.height/4, bullet.width/2, bullet.height/2);
-
-                    // Targeting indicator (subtle)
-                    ctx.strokeStyle = '#ff5555';
-                    ctx.lineWidth = 1;
-                    ctx.globalAlpha = 0.5;
-                    ctx.beginPath();
-                    ctx.arc(bullet.x + bullet.width/2, bullet.y, bullet.width * 1.5, 0, Math.PI * 2);
-                    ctx.stroke();
-                    ctx.globalAlpha = 1;
-                } else if (bullet.type === 'bomb') {
-                    ctx.fillStyle = '#f1c40f';
-                    ctx.beginPath();
-                    ctx.arc(bullet.x, bullet.y, 4, 0, Math.PI * 2);
-                    ctx.fill();
-
-                    ctx.fillStyle = '#ff5555';
-                    ctx.beginPath();
-                    ctx.arc(bullet.x - 2, bullet.y - 4, 2, 0, Math.PI * 2);
-                    ctx.fill();
-                } else if (bullet.type === 'enemyHoming') {
-                    // Enemy heat-seeking missile - orange with darker trail
-                    ctx.fillStyle = '#ff8c00';
-                    ctx.beginPath();
-                    ctx.arc(bullet.x, bullet.y, 3, 0, Math.PI * 2);
-                    ctx.fill();
-
-                    ctx.fillStyle = '#cc5500';
-                    ctx.beginPath();
-                    ctx.arc(bullet.x - 2, bullet.y - 2, 1.5, 0, Math.PI * 2);
-                    ctx.fill();
-                } else {
-                    ctx.fillStyle = '#ff5555';
-                    ctx.beginPath();
-                    ctx.arc(bullet.x, bullet.y, 3, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-            });
-            
-            // Draw explosions
-            explosions.forEach(explosion => {
-                let progress = explosion.timer / explosion.maxTimer;
-                let size = explosion.size * (1 - progress);
-                
-                ctx.fillStyle = `rgba(255, 85, 85, ${1 - progress})`;
-                ctx.beginPath();
-                ctx.arc(explosion.x, explosion.y, size / 2, 0, Math.PI * 2);
-                ctx.fill();
-                
-                ctx.fillStyle = `rgba(255, 184, 108, ${1 - progress})`;
-                ctx.beginPath();
-                ctx.arc(explosion.x, explosion.y, size / 3, 0, Math.PI * 2);
-                ctx.fill();
-            });
-            
-            // Draw power-ups
-            powerUps.forEach(powerUp => {
-                ctx.save();
-                ctx.translate(powerUp.x + 8, powerUp.y + 8);
-
-                // Smooth opacity pulsing instead of on/off blinking
-                let opacity = (Math.sin(powerUp.timer * 0.1) + 1) * 0.5; // 0 to 1 range
-                ctx.globalAlpha = 0.3 + opacity * 0.7; // 0.3 to 1.0 opacity
-
-                switch (powerUp.type) {
-                    case 'bombs':
-                        ctx.fillStyle = '#f1c40f';
-                        ctx.beginPath();
-                        ctx.arc(0, 0, 8, 0, Math.PI * 2);
-                        ctx.fill();
-                        ctx.fillStyle = '#282a36';
-                        ctx.font = '12px monospace';
-                        ctx.textAlign = 'center';
-                        ctx.fillText('B', 0, 4);
-                        break;
-                    case 'shield':
-                        ctx.strokeStyle = '#8be9fd';
-                        ctx.lineWidth = 3;
-                        ctx.beginPath();
-                        ctx.arc(0, 0, 8, 0, Math.PI * 2);
-                        ctx.stroke();
-                        break;
-                    case 'life':
-                        // Larger free life powerup
-                        ctx.fillStyle = '#50fa7b';
-                        ctx.beginPath();
-                        ctx.moveTo(0, -12);
-                        ctx.lineTo(-9, 12);
-                        ctx.lineTo(9, 12);
-                        ctx.closePath();
-                        ctx.fill();
-                        break;
-                }
-                ctx.restore();
-            });
-
-            ctx.restore(); // Restore camera translation
-        }
-        
-        function updateUI() {
-            document.getElementById('score').textContent = score;
-            document.getElementById('lives').textContent = lives;
-            document.getElementById('bombs').textContent = bombs;
-            document.getElementById('shield').textContent = Math.max(0, shield);
-            document.getElementById('time').textContent = Math.floor(gameTime / 1000);
-            document.getElementById('distance').textContent = Math.floor(distanceTraveled / 100); // Convert pixels to parsecs
-
-            // Draw power meter
-            const powerMeterCanvas = document.getElementById('powerMeter');
-            const pmCtx = powerMeterCanvas.getContext('2d');
-
-            // Clear power meter
-            pmCtx.fillStyle = '#282a36';
-            pmCtx.fillRect(0, 0, powerMeterCanvas.width, powerMeterCanvas.height);
-
-            // Draw power meter background
-            pmCtx.strokeStyle = '#6272a4';
-            pmCtx.lineWidth = 2;
-            pmCtx.strokeRect(2, 2, powerMeterCanvas.width - 4, powerMeterCanvas.height - 4);
-
-            // Draw power level
-            const powerPercent = Math.max(0, shield) / 100;
-            const barWidth = (powerMeterCanvas.width - 8) * powerPercent;
-
-            // Color based on health level
-            if (shield > 60) {
-                pmCtx.fillStyle = '#50fa7b'; // Green for good health
-            } else if (shield > 30) {
-                pmCtx.fillStyle = '#ffb86c'; // Yellow for medium health
-            } else {
-                pmCtx.fillStyle = '#ff5555'; // Red for low health
-            }
-
-            pmCtx.fillRect(4, 4, barWidth, powerMeterCanvas.height - 8);
-        }
-        
-        function gameLoop(currentTime) {
-            if (gameState !== 'playing') return;
-
-            let deltaTime = currentTime - lastTime;
-            lastTime = currentTime;
-            gameTime += deltaTime;
-
-            // Gradually increase game speed over time and with powerups (much slower progression)
-            let baseSpeed = 1.0;
-            let timeBonus = Math.min(gameTime / 600000, 0.2); // Max 20% speed increase over 10 minutes (much slower)
-            let powerupBonus = Math.min((bombs - 3) * 0.05, 0.1); // Speed up with extra bombs (max 10%, much less aggressive)
-            gameSpeed = baseSpeed + timeBonus + powerupBonus;
-
-            // Apply speed multiplier to deltaTime
-            let adjustedDeltaTime = deltaTime * gameSpeed;
-
-            updatePlayer();
-            updateBullets();
-            updateEnemies();
-            updatePowerUps();
-            updateExplosions();
-            checkCollisions();
-            spawnEnemy();
-
-                    // Check for shop every 30 seconds
-            if (gameTime - lastShopTime > 30000) {
-                showShop();
-            }
-
-            draw();
-            updateUI();
-
-            requestAnimationFrame(gameLoop);
-        }
-        
-        // Load high scores from localStorage
-        function loadHighScores() {
-            const saved = localStorage.getItem('defenderHighScores');
-            if (saved) {
-                highScores = JSON.parse(saved);
-            } else {
-                highScores = [];
-            }
-        }
-
-        // Save high scores to localStorage
-        function saveHighScores() {
-            localStorage.setItem('defenderHighScores', JSON.stringify(highScores));
-        }
-
-        // Add score to high scores list
-        function addHighScore(name, score) {
-            highScores.push({ name: name, score: score });
-            highScores.sort((a, b) => b.score - a.score);
-            highScores = highScores.slice(0, 10); // Keep only top 10
-            saveHighScores();
-        }
-
-        // Check if score is a high score
-        function isHighScore(score) {
-            return highScores.length < 10 || score > highScores[highScores.length - 1].score;
-        }
-
-        // Audio functions
-        function initAudio() {
-            try {
-                audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            } catch (e) {
-                console.log('Web Audio API not supported');
-            }
-        }
-
-        function playSound(frequency, duration, type = 'square', volume = 0.1) {
-            if (!audioContext) return;
-
-            const oscillator = audioContext.createOscillator();
-            const gainNode = audioContext.createGain();
-
-            oscillator.connect(gainNode);
-            gainNode.connect(audioContext.destination);
-
-            oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
-            oscillator.type = type;
-
-            gainNode.gain.setValueAtTime(volume, audioContext.currentTime);
-            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
-
-            oscillator.start(audioContext.currentTime);
-            oscillator.stop(audioContext.currentTime + duration);
-        }
-
-        function playLaserSound() {
-            // Very quiet laser sound - only play if enough time has passed
-            const now = Date.now();
-            if (now - lastLaserTime > 50) { // Limit to prevent spam
-                playSound(800, 0.05, 'square', 0.02);
-                lastLaserTime = now;
-            }
-        }
-
-        function playExplosionSound() {
-            // Enemy explosion - descending tone
-            playSound(300, 0.2, 'sawtooth', 0.08);
-            setTimeout(() => playSound(150, 0.1, 'sawtooth', 0.06), 50);
-        }
-
-        function playBombExplosionSound() {
-            // Bomb explosion - low frequency rumble
-            playSound(100, 0.3, 'sawtooth', 0.1);
-            setTimeout(() => playSound(80, 0.2, 'sawtooth', 0.08), 100);
-        }
-
-        function playPowerUpSound() {
-            // Positive ascending tone for power-ups
-            playSound(400, 0.1, 'sine', 0.06);
-            setTimeout(() => playSound(600, 0.1, 'sine', 0.06), 50);
-        }
-
-        // Shop functions
-        function showShop() {
-            console.log('Shop triggered! Credits:', credits, 'Upgrades:', upgrades);
-            gameState = 'shop';
-            lastShopTime = gameTime;
-            document.getElementById('shopCredits').textContent = `Credits: ${credits}`;
-
-            updateShopButtons();
-
-            const shopScreen = document.getElementById('shopScreen');
-            shopScreen.style.display = 'block';
-            // Use setTimeout to ensure display:block is applied before adding the class
-            setTimeout(() => {
-                shopScreen.classList.add('show');
-            }, 10);
-        }
-
-        function updateShopButtons() {
-            const shopUpgrades = document.getElementById('shopUpgrades');
-            shopUpgrades.innerHTML = ''; // Clear all existing items
-
-            // Plasma Blaster - only show if not purchased
-            if (!upgrades.plasmaBlaster) {
-                const plasmaDiv = document.createElement('div');
-                plasmaDiv.className = 'upgrade';
-                plasmaDiv.id = 'plasmaBlaster';
-                plasmaDiv.innerHTML = `
-                    <h3>PLASMA BLASTER - 100 Credits</h3>
-                    <p>Larger purple projectiles, reduced fire rate, increased damage</p>
-                    <button onclick="purchaseUpgrade('plasmaBlaster')" ${credits >= 100 ? 'class="affordable"' : ''}>PURCHASE</button>
-                `;
-                shopUpgrades.appendChild(plasmaDiv);
-            }
-
-            // Missiles - show appropriate tier
-            if (upgrades.missiles < 2) {
-                const missilesDiv = document.createElement('div');
-                missilesDiv.className = 'upgrade';
-                missilesDiv.id = 'missiles';
-
-                if (upgrades.missiles === 0) {
-                    missilesDiv.innerHTML = `
-                        <h3>MISSILES TIER 1 - 100 Credits</h3>
-                        <p>White rockets below blaster, slower but high damage</p>
-                        <button onclick="purchaseUpgrade('missiles')" ${credits >= 100 ? 'class="affordable"' : ''}>PURCHASE</button>
-                    `;
-                } else if (upgrades.missiles === 1) {
-                    missilesDiv.innerHTML = `
-                        <h3>MISSILES TIER 2 - 200 Credits</h3>
-                        <p>Second missile above blaster, same high damage</p>
-                        <button onclick="purchaseUpgrade('missiles')" ${credits >= 200 ? 'class="affordable"' : ''}>UPGRADE</button>
-                    `;
-                }
-                shopUpgrades.appendChild(missilesDiv);
-            }
-
-            // Homing Missiles - show appropriate tier
-            if (upgrades.homingMissiles < 2) {
-                const homingDiv = document.createElement('div');
-                homingDiv.className = 'upgrade';
-                homingDiv.id = 'homingMissiles';
-
-                if (upgrades.homingMissiles === 0) {
-                    homingDiv.innerHTML = `
-                        <h3>HOMING MISSILES TIER 1 - 200 Credits</h3>
-                        <p>Red projectiles that auto-target strongest enemy</p>
-                        <button onclick="purchaseUpgrade('homingMissiles')" ${credits >= 200 ? 'class="affordable"' : ''}>PURCHASE</button>
-                    `;
-                } else if (upgrades.homingMissiles === 1) {
-                    homingDiv.innerHTML = `
-                        <h3>HOMING MISSILES TIER 2 - 400 Credits</h3>
-                        <p>Second missile targets nearest healthy enemy</p>
-                        <button onclick="purchaseUpgrade('homingMissiles')" ${credits >= 400 ? 'class="affordable"' : ''}>UPGRADE</button>
-                    `;
-                }
-                shopUpgrades.appendChild(homingDiv);
-            }
-
-            // Bomb Capacity - only show if not purchased
-            if (!upgrades.bombCapacity) {
-                const bombDiv = document.createElement('div');
-                bombDiv.className = 'upgrade';
-                bombDiv.id = 'bombCapacity';
-                bombDiv.innerHTML = `
-                    <h3>BOMB CAPACITY UPGRADE - 350 Credits</h3>
-                    <p>Increase maximum bomb capacity from 9 to 50 bombs</p>
-                    <button onclick="purchaseUpgrade('bombCapacity')" ${credits >= 350 ? 'class="affordable"' : ''}>PURCHASE</button>
-                `;
-                shopUpgrades.appendChild(bombDiv);
-            }
-        }
-
-        function closeShop() {
-            const shopScreen = document.getElementById('shopScreen');
-            shopScreen.classList.remove('show');
-            // Wait for transition to complete before hiding
-            setTimeout(() => {
-                shopScreen.style.display = 'none';
-                gameState = 'playing';
-                // Restart the game loop
-                gameLoop(performance.now());
-            }, 300);
-        }
-
-        function purchaseUpgrade(upgradeType) {
-            let cost = 0;
-            let canPurchase = false;
-
-            if (upgradeType === 'plasmaBlaster') {
-                cost = 100;
-                canPurchase = !upgrades.plasmaBlaster && credits >= cost;
-            } else if (upgradeType === 'missiles') {
-                cost = upgrades.missiles === 0 ? 100 : 200; // Tier 1: 100, Tier 2: 200
-                canPurchase = upgrades.missiles < 2 && credits >= cost;
-            } else if (upgradeType === 'homingMissiles') {
-                cost = upgrades.homingMissiles === 0 ? 200 : 400; // Tier 1: 200, Tier 2: 400
-                canPurchase = upgrades.homingMissiles < 2 && credits >= cost;
-            } else if (upgradeType === 'bombCapacity') {
-                cost = 350;
-                canPurchase = !upgrades.bombCapacity && credits >= cost;
-            }
-
-            if (canPurchase) {
-                credits -= cost;
-                if (upgradeType === 'plasmaBlaster') {
-                    upgrades.plasmaBlaster = true;
-                } else if (upgradeType === 'missiles') {
-                    upgrades.missiles++;
-                } else if (upgradeType === 'homingMissiles') {
-                    upgrades.homingMissiles++;
-                } else if (upgradeType === 'bombCapacity') {
-                    upgrades.bombCapacity = true;
-                }
-
-                document.getElementById('shopCredits').textContent = `Credits: ${credits}`;
-                updateShopButtons();
-            }
-        }
-
-        // Initialize
-        loadHighScores();
-        initTerrain();
-        initStars();
-        initAudio();
-    </script>
+        createExplosion(b.x,b.y,25);
+        break;
+      }
+    }
+  }
+
+  // Enemy bullets vs player (use bullet.damage if present)
+  for (let i=bullets.length-1;i>=0;i--){
+    const b=bullets[i];
+    if (b.type!=='enemy' && b.type!=='enemyHoming') continue;
+    if (checkCollision(b, player)){
+      shield -= (b.damage || 10);
+      bullets.splice(i,1);
+      createExplosion(player.x+player.width/2, player.y+player.height/2, 30);
+    }
+  }
+
+  // Enemies vs player
+  enemies.forEach(e=>{
+    if (checkCollision(e,player)){
+      shield -= 20;
+      createExplosion(player.x+player.width/2, player.y+player.height/2, 40);
+      e.health = 0;
+    }
+  });
+
+  if (shield<=0){
+    lives--; shield=100;
+    if (lives<=0) gameOver();
+  }
+}
+
+/* ================== FX & UI ================== */
+function createExplosion(x,y,size){
+  explosions.push({ x,y,size, timerMs:0, maxTimerMs: 20*FRAME_MS });
+}
+
+function gameOver(){
+  gameState='gameOver';
+  const parsecs = Math.floor(distanceTraveled/100);
+  const finalScore = score + Math.floor(gameTime/1000)*10 + parsecs*5;
+  if (isHighScore(finalScore)){ addHighScore(playerName, finalScore); document.getElementById('finalScore').textContent=`NEW HIGH SCORE: ${finalScore}`; }
+  else { document.getElementById('finalScore').textContent=`Final Score: ${finalScore}`; }
+  document.getElementById('playerNameDisplay').textContent=`Player: ${playerName} - ${parsecs} Parsecs Traveled`;
+  document.getElementById('gameOverScreen').style.display='block';
+}
+
+function draw(){
+  ctx.fillStyle='#282a36'; ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.save(); ctx.translate(-cameraX,0);
+
+  // stars parallax
+  const parallax=0.4;
+  ctx.fillStyle='#8be9fd';
+  stars.forEach(s=>{
+    ctx.globalAlpha = s.brightness*0.7;
+    const sx = s.x + cameraX*(1-parallax);
+    ctx.fillRect(sx, s.y, 1, 1);
+  });
+  ctx.globalAlpha = 1;
+
+  // terrain
+  ctx.strokeStyle='#ffb86c'; ctx.lineWidth=2; ctx.beginPath();
+  terrain.forEach((p,i)=>{ i===0 ? ctx.moveTo(p.x,p.y) : ctx.lineTo(p.x,p.y); }); ctx.stroke();
+  ctx.fillStyle='#bd93f9'; ctx.beginPath();
+  terrain.forEach((p,i)=>{ i===0 ? ctx.moveTo(p.x,p.y) : ctx.lineTo(p.x,p.y); });
+  ctx.lineTo(canvas.width+cameraX,canvas.height); ctx.lineTo(cameraX,canvas.height); ctx.closePath(); ctx.fill();
+
+  // player
+  ctx.save(); ctx.translate(player.x+player.width/2, player.y+player.height/2);
+  ctx.fillStyle='#50fa7b'; ctx.beginPath();
+  ctx.moveTo(15,0); ctx.lineTo(-10,-8); ctx.lineTo(-5,0); ctx.lineTo(-10,8); ctx.closePath(); ctx.fill();
+  ctx.fillStyle='#ff5555'; ctx.beginPath();
+  ctx.moveTo(-5,-3); ctx.lineTo(-15,0); ctx.lineTo(-5,3); ctx.closePath(); ctx.fill();
+  ctx.restore();
+
+  // enemies
+  enemies.forEach(e=>{
+    ctx.save(); ctx.translate(e.x, e.y);
+    if (e.type==='dinosaur'){
+      ctx.fillStyle='#50fa7b'; ctx.fillRect(8,15,16,12); ctx.fillRect(20,10,8,8);
+      ctx.fillRect(10,27,2,8); ctx.fillRect(18,27,2,8);
+      ctx.fillStyle='#ffffff'; ctx.fillRect(22,12,1,1); ctx.fillRect(25,12,1,1);
+      ctx.fillStyle='#50fa7b'; ctx.fillRect(8,12,2,3); ctx.fillRect(12,10,2,5); ctx.fillRect(16,8,2,7);
+    } else if (e.type==='fighter'){
+      ctx.fillStyle='#ff5555';
+      ctx.fillRect(6,8,Math.max(12, e.width-13),8); // scale a bit with width
+      ctx.fillRect(2,10,4,4); ctx.fillRect( (6+Math.max(12, e.width-13)),10,4,4);
+      ctx.fillStyle='#ffb86c'; ctx.fillRect(10,6,4,4);
+    } else if (e.type==='bomber'){
+      ctx.fillStyle='#ffb86c'; ctx.fillRect(8,12,8,6);
+      ctx.fillRect(4,14,4,2); ctx.fillRect(16,14,4,2);
+      ctx.fillRect(10,8,4,4);
+    } else if (e.type==='boss'){
+      ctx.fillStyle='#ff5555'; ctx.fillRect(10,15,20,15);
+      ctx.fillStyle='#ffffff'; ctx.fillRect(14,18,2,2); ctx.fillRect(24,18,2,2);
+      ctx.fillStyle='#000000'; ctx.fillRect(16,25,8,2);
+      ctx.fillStyle='#ff5555'; ctx.fillRect(12,10,1,5); ctx.fillRect(27,10,1,5);
+    } else if (e.type==='sandworm'){
+      // draw segmented worm
+      const seg = e.segmentCount||8;
+      for (let s=0;s<seg;s++){
+        const r = 12 - s*1.2;
+        ctx.fillStyle = s===0 ? '#d2b48c' : '#bda16f';
+        ctx.beginPath(); ctx.arc(e.width/2 - s*14, e.height/2, Math.max(4,r), 0, Math.PI*2); ctx.fill();
+      }
+      // simple eye on head
+      ctx.fillStyle='#000'; ctx.fillRect(e.width/2-4, e.height/2-4, 3,3);
+    }
+    ctx.restore();
+  });
+
+  // bullets
+  bullets.forEach(b=>{
+    if (b.type==='laser'){
+      ctx.strokeStyle='#8be9fd'; ctx.lineWidth=3; ctx.beginPath();
+      ctx.moveTo(b.x,b.y); ctx.lineTo(b.x+12,b.y); ctx.stroke();
+      ctx.strokeStyle='#ffffff'; ctx.lineWidth=1; ctx.beginPath();
+      ctx.moveTo(b.x,b.y); ctx.lineTo(b.x+12,b.y); ctx.stroke();
+    } else if (b.type==='plasma'){
+      ctx.fillStyle='#bd93f9'; ctx.fillRect(b.x, b.y-3, b.width, b.height);
+      ctx.strokeStyle='#ff79c6'; ctx.lineWidth=2; ctx.strokeRect(b.x, b.y-3, b.width, b.height);
+    } else if (b.type==='missile'){
+      ctx.fillStyle='#ffffff'; ctx.fillRect(b.x, b.y-2, b.width, b.height);
+      ctx.fillStyle='#ff5555'; ctx.fillRect(b.x-4, b.y-1, 4, 2);
+    } else if (b.type==='homing'){
+      ctx.fillStyle='#ff5555'; ctx.fillRect(b.x, b.y-b.height/2, b.width, b.height);
+      ctx.fillStyle='#ffffff'; ctx.fillRect(b.x-b.width/2, b.y-b.height/4, b.width/2, b.height/2);
+      ctx.strokeStyle='#ff5555'; ctx.lineWidth=1; ctx.globalAlpha=0.5;
+      ctx.beginPath(); ctx.arc(b.x+b.width/2, b.y, b.width*1.5, 0, Math.PI*2); ctx.stroke();
+      ctx.globalAlpha=1;
+    } else if (b.type==='bomb'){
+      ctx.fillStyle='#f1c40f'; ctx.beginPath(); ctx.arc(b.x,b.y,4,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#ff5555'; ctx.beginPath(); ctx.arc(b.x-2,b.y-4,2,0,Math.PI*2); ctx.fill();
+    } else if (b.type==='enemyHoming'){
+      ctx.fillStyle='#ff8c00'; ctx.beginPath(); ctx.arc(b.x,b.y,3,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#cc5500'; ctx.beginPath(); ctx.arc(b.x-2,b.y-2,1.5,0,Math.PI*2); ctx.fill();
+    } else if (b.type==='torpedo'){
+      // big electric torpedo
+      ctx.fillStyle='#8be9fd'; ctx.fillRect(b.x, b.y-b.height/2, b.width, b.height);
+      ctx.strokeStyle='#bd93f9'; ctx.lineWidth=2; ctx.strokeRect(b.x, b.y-b.height/2, b.width, b.height);
+      // electric arcs
+      ctx.strokeStyle='#ffffff'; ctx.lineWidth=1; ctx.beginPath();
+      ctx.moveTo(b.x+4, b.y-6); ctx.lineTo(b.x+10, b.y-2); ctx.lineTo(b.x+16, b.y-6); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(b.x+6, b.y+6); ctx.lineTo(b.x+12, b.y+2); ctx.lineTo(b.x+18, b.y+6); ctx.stroke();
+    } else {
+      ctx.fillStyle='#ff5555'; ctx.beginPath(); ctx.arc(b.x,b.y,3,0,Math.PI*2); ctx.fill();
+    }
+  });
+
+  // explosions
+  explosions.forEach(ex=>{
+    const pr = ex.timerMs / ex.maxTimerMs;
+    const sz = ex.size*(1-pr);
+    ctx.fillStyle = `rgba(255,85,85,${1-pr})`;
+    ctx.beginPath(); ctx.arc(ex.x,ex.y,sz/2,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = `rgba(255,184,108,${1-pr})`;
+    ctx.beginPath(); ctx.arc(ex.x,ex.y,sz/3,0,Math.PI*2); ctx.fill();
+  });
+
+  // powerups
+  powerUps.forEach(p=>{
+    ctx.save(); ctx.translate(p.x+8, p.y+8);
+    const op = (Math.sin((p.timerMs||0)*0.1*0.06)+1)*0.5; ctx.globalAlpha=0.3+op*0.7;
+    if (p.type==='bombs'){
+      ctx.fillStyle='#f1c40f'; ctx.beginPath(); ctx.arc(0,0,8,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#282a36'; ctx.font='12px monospace'; ctx.textAlign='center'; ctx.fillText('B',0,4);
+    } else if (p.type==='shield'){
+      ctx.strokeStyle='#8be9fd'; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(0,0,8,0,Math.PI*2); ctx.stroke();
+    } else if (p.type==='life'){
+      ctx.fillStyle='#50fa7b'; ctx.beginPath(); ctx.moveTo(0,-12); ctx.lineTo(-9,12); ctx.lineTo(9,12); ctx.closePath(); ctx.fill();
+    }
+    ctx.restore();
+  });
+
+  ctx.restore();
+}
+
+function updateUI(){
+  document.getElementById('score').textContent = score;
+  document.getElementById('lives').textContent = lives;
+  document.getElementById('bombs').textContent = bombs;
+  document.getElementById('shield').textContent = Math.max(0, shield);
+  document.getElementById('time').textContent = Math.floor(gameTime/1000);
+  document.getElementById('distance').textContent = Math.floor(distanceTraveled/100);
+
+  const pm = document.getElementById('powerMeter');
+  const pctx = pm.getContext('2d');
+  pctx.fillStyle='#282a36'; pctx.fillRect(0,0,pm.width,pm.height);
+  pctx.strokeStyle='#6272a4'; pctx.lineWidth=2; pctx.strokeRect(2,2,pm.width-4,pm.height-4);
+  const perc = Math.max(0,shield)/100, w=(pm.width-8)*perc;
+  pctx.fillStyle = shield>60 ? '#50fa7b' : shield>30 ? '#ffb86c' : '#ff5555';
+  pctx.fillRect(4,4,w,pm.height-8);
+}
+
+/* ================== Audio ================== */
+function playSound(freq, dur, type='square', vol=0.1){
+  if (!audioContext) return;
+  const osc=audioContext.createOscillator(), g=audioContext.createGain();
+  osc.connect(g); g.connect(audioContext.destination);
+  osc.frequency.setValueAtTime(freq, audioContext.currentTime); osc.type=type;
+  g.gain.setValueAtTime(vol, audioContext.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime+dur);
+  osc.start(audioContext.currentTime); osc.stop(audioContext.currentTime+dur);
+}
+function playLaserSound(){ const now=Date.now(); if (now-lastLaserTime>50){ playSound(800,0.05,'square',0.02); lastLaserTime=now; } }
+function playExplosionSound(){ playSound(300,0.2,'sawtooth',0.08); setTimeout(()=>playSound(150,0.1,'sawtooth',0.06),50); }
+function playBombExplosionSound(){ playSound(100,0.3,'sawtooth',0.1); setTimeout(()=>playSound(80,0.2,'sawtooth',0.08),100); }
+function playPowerUpSound(){ playSound(400,0.1,'sine',0.06); setTimeout(()=>playSound(600,0.1,'sine',0.06),50); }
+
+/* ================== Shop ================== */
+function showShop(){
+  gameState='shop'; lastShopTime=gameTime;
+  document.getElementById('shopCredits').textContent = `Credits: ${credits}`;
+  updateShopButtons();
+  const s=document.getElementById('shopScreen'); s.style.display='block'; setTimeout(()=>s.classList.add('show'),10);
+}
+function updateShopButtons(){
+  const c=document.getElementById('shopUpgrades'); c.innerHTML='';
+  if (!upgrades.plasmaBlaster){
+    c.innerHTML += `
+      <div class="upgrade" id="plasmaBlaster">
+        <h3>PLASMA BLASTER - 100 Credits</h3>
+        <p>Larger purple projectiles, reduced fire rate, increased damage</p>
+        <button onclick="purchaseUpgrade('plasmaBlaster')" ${credits>=100?'class="affordable"':''}>PURCHASE</button>
+      </div>`;
+  }
+  if (upgrades.missiles<2){
+    if (upgrades.missiles===0){
+      c.innerHTML += `
+        <div class="upgrade" id="missiles">
+          <h3>MISSILES TIER 1 - 100 Credits</h3>
+          <p>White rockets below blaster, slower but high damage</p>
+          <button onclick="purchaseUpgrade('missiles')" ${credits>=100?'class="affordable"':''}>PURCHASE</button>
+        </div>`;
+    } else {
+      c.innerHTML += `
+        <div class="upgrade" id="missiles">
+          <h3>MISSILES TIER 2 - 200 Credits</h3>
+          <p>Second missile above blaster, same high damage</p>
+          <button onclick="purchaseUpgrade('missiles')" ${credits>=200?'class="affordable"':''}>UPGRADE</button>
+        </div>`;
+    }
+  }
+  if (upgrades.homingMissiles<2){
+    if (upgrades.homingMissiles===0){
+      c.innerHTML += `
+        <div class="upgrade" id="homingMissiles">
+          <h3>HOMING MISSILES TIER 1 - 200 Credits</h3>
+          <p>Red projectiles that auto-target strongest enemy</p>
+          <button onclick="purchaseUpgrade('homingMissiles')" ${credits>=200?'class="affordable"':''}>PURCHASE</button>
+        </div>`;
+    } else {
+      c.innerHTML += `
+        <div class="upgrade" id="homingMissiles">
+          <h3>HOMING MISSILES TIER 2 - 400 Credits</h3>
+          <p>Second missile targets nearest healthy enemy</p>
+          <button onclick="purchaseUpgrade('homingMissiles')" ${credits>=400?'class="affordable"':''}>UPGRADE</button>
+        </div>`;
+    }
+  }
+  if (!upgrades.bombCapacity){
+    c.innerHTML += `
+      <div class="upgrade" id="bombCapacity">
+        <h3>BOMB CAPACITY UPGRADE - 350 Credits</h3>
+        <p>Increase maximum bomb capacity from 9 to 50 bombs</p>
+        <button onclick="purchaseUpgrade('bombCapacity')" ${credits>=350?'class="affordable"':''}>PURCHASE</button>
+      </div>`;
+  }
+  // NEW: Torpedo upgrade
+  if (!upgrades.torpedo){
+    c.innerHTML += `
+      <div class="upgrade" id="torpedoUpgrade">
+        <h3>TORPEDO LAUNCHER - 300 Credits</h3>
+        <p>Unlocks <b>T</b>: fires a large electric torpedo with heavy damage & small AoE</p>
+        <button onclick="purchaseUpgrade('torpedo')" ${credits>=300?'class="affordable"':''}>PURCHASE</button>
+      </div>`;
+  }
+}
+function closeShop(){
+  const s=document.getElementById('shopScreen');
+  s.classList.remove('show');
+  setTimeout(()=>{
+    s.style.display='none';
+    gameState='playing';
+    lastShopTime = gameTime + 5000;
+    startMainLoop();
+  },300);
+}
+function purchaseUpgrade(which){
+  let cost=0, ok=false;
+  if (which==='plasmaBlaster'){ cost=100; ok=!upgrades.plasmaBlaster && credits>=cost; }
+  else if (which==='missiles'){ cost = upgrades.missiles===0?100:200; ok=upgrades.missiles<2 && credits>=cost; }
+  else if (which==='homingMissiles'){ cost = upgrades.homingMissiles===0?200:400; ok=upgrades.homingMissiles<2 && credits>=cost; }
+  else if (which==='bombCapacity'){ cost=350; ok=!upgrades.bombCapacity && credits>=cost; }
+  else if (which==='torpedo'){ cost=300; ok=!upgrades.torpedo && credits>=cost; }
+  if (ok){
+    credits -= cost;
+    if (which==='plasmaBlaster') upgrades.plasmaBlaster=true;
+    else if (which==='missiles') upgrades.missiles++;
+    else if (which==='homingMissiles') upgrades.homingMissiles++;
+    else if (which==='bombCapacity') upgrades.bombCapacity=true;
+    else if (which==='torpedo') upgrades.torpedo=true;
+    document.getElementById('shopCredits').textContent=`Credits: ${credits}`;
+    updateShopButtons();
+  }
+}
+
+/* ================== Scores ================== */
+function loadHighScores(){ const s=localStorage.getItem('defenderHighScores'); highScores = s? JSON.parse(s):[]; }
+function saveHighScores(){ localStorage.setItem('defenderHighScores', JSON.stringify(highScores)); }
+function addHighScore(name,score){ highScores.push({name,score}); highScores.sort((a,b)=>b.score-a.score); highScores=highScores.slice(0,10); saveHighScores(); }
+function isHighScore(score){ return highScores.length<10 || score>highScores[highScores.length-1].score; }
+
+/* ================== Loop ================== */
+function gameLoop(now){
+  if (gameState!=='playing') return;
+  let delta = now - lastTime; if (delta>100) delta=100; lastTime=now;
+  gameTime += delta;
+
+  const timeBonus = Math.min(gameTime/600000, 0.2);
+  const powerupBonus = Math.min((bombs-3)*0.05, 0.1);
+  gameSpeed = 1.0 + timeBonus + powerupBonus;
+  delta *= gameSpeed;
+
+  const dt = delta / 16.67;
+
+  updatePlayer(dt, delta);
+  updateBullets(dt, delta);
+  updateEnemies(dt, delta);
+  updatePowerUps(dt, delta);
+  updateExplosions(delta);
+  checkCollisions();
+  spawnEnemy(delta);
+
+  if (gameTime - lastShopTime > 30000) showShop();
+
+  draw();
+  updateUI();
+  requestAnimationFrame(gameLoop);
+}
+
+/* ================== Init ================== */
+function initAudio(){ /* deferred to interaction */ }
+loadHighScores(); initTerrain(); initStars(); initAudio();
+</script>
 </body>
 </html>
